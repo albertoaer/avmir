@@ -54,7 +54,10 @@ impl Parser for Simple {
 
   fn parse(source: impl AsRef<str>) -> Result<Program, Self::Err> {
     let mut program = Program::new();
-    for (idx, line) in source.as_ref().lines().enumerate() {
+    for (idx, line) in source.as_ref().lines().map(|l| l.trim()).enumerate() {
+      if line.is_empty() {
+        continue;
+      }
       program.push(parse_instruction(line).map_err(|err| SimpleParserError(idx + 1, err))?);
     }
     Ok(program)
