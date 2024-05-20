@@ -1,4 +1,4 @@
-use super::program::{InstructionParam, Program};
+use super::program::{InstructionParam, Opcode, Program};
 
 #[derive(Clone, Debug, Copy)]
 pub enum StackValue {
@@ -60,7 +60,8 @@ impl Stack {
     if self.offset == 32 {
       panic!("stack overflow")
     }
-    self.items[self.offset as usize] = value
+    self.items[self.offset as usize] = value;
+    self.offset += 1
   }
 }
 
@@ -86,30 +87,44 @@ impl Process {
 
     let first = |stack: &mut Stack| instruction.1.and_then(|x| Some(x.into())).or_else(|| stack.pop())
       .expect("expected first operand");
-    let second = |stack: &mut Stack| instruction.1.and_then(|x| Some(x.into())).or_else(|| stack.pop())
+    let second = |stack: &mut Stack| instruction.2.and_then(|x| Some(x.into())).or_else(|| stack.pop())
       .expect("expected second operand");
 
     match instruction.0 {
-      super::program::Opcode::Add => {
+      Opcode::Add => {
         let (a, b) = (first(stack), second(stack));
         stack.push(same_type!(+ => a, b));
       },
-      super::program::Opcode::Sub => {
+      Opcode::Sub => {
         let (a, b) = (first(stack), second(stack));
         stack.push(same_type!(- => a, b));
       },
-      super::program::Opcode::Mul => {
+      Opcode::Mul => {
         let (a, b) = (first(stack), second(stack));
         stack.push(same_type!(* => a, b));
       },
-      super::program::Opcode::Div => {
+      Opcode::Div => {
         let (a, b) = (first(stack), second(stack));
         stack.push(same_type!(/ => a, b));
       },
-      super::program::Opcode::Discard => { stack.pop(); },
-      super::program::Opcode::Clone => if let Some(item) = stack.peek() { stack.push(item) },
+      Opcode::Discard => { stack.pop(); },
+      Opcode::Clone => if let Some(item) = stack.peek() { stack.push(item) },
+      Opcode::Debug => if let Some(item) = stack.peek() { println!("{:?}", item) }
+      Opcode::Push => {
+        let item = first(stack);
+        stack.push(item)
+      },
+      Opcode::Int => match first(stack) {
+        StackValue::Int(x) => stack.push(StackValue::Int(x)),
+        StackValue::Float(x) => stack.push(StackValue::Int(x as i64)),
+      },
+      Opcode::Float => match first(stack) {
+        StackValue::Int(x) => stack.push(StackValue::Float(x as f64)),
+        StackValue::Float(x) => stack.push(StackValue::Float(x)),
+      },
     };
 
-    return self.pc >= self.program.len();
+    self.pc += 1;
+    return self.pc < self.program.len();
   }
 }

@@ -1,11 +1,17 @@
-#[derive(Clone, Debug, Copy)]
+use strum_macros::EnumString;
+
+#[derive(Clone, Debug, Copy, EnumString)]
 pub enum Opcode {
   Add,
   Sub,
   Mul,
   Div,
   Discard,
-  Clone
+  Clone,
+  Debug,
+  Push,
+  Int,
+  Float
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -18,11 +24,11 @@ pub enum InstructionParam {
 pub struct Instruction(pub Opcode, pub Option<InstructionParam>, pub Option<InstructionParam>);
 
 impl Instruction {
-  fn new(opcode: Opcode) -> Instruction {
+  pub fn new(opcode: Opcode) -> Instruction {
     Instruction(opcode, None, None)
   }
 
-  fn new_args(opcode: Opcode, first: Option<InstructionParam>, second: Option<InstructionParam>) -> Instruction {
+  pub fn new_args(opcode: Opcode, first: Option<InstructionParam>, second: Option<InstructionParam>) -> Instruction {
     Instruction(opcode, first, second)
   }
 }
