@@ -1,3 +1,5 @@
+use core::fmt;
+
 use super::program::{InstructionParam, Opcode, Program};
 
 #[derive(Clone, Debug, Copy)]
@@ -25,10 +27,16 @@ impl From<InstructionParam> for StackValue {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Stack {
   items: [StackValue; 32],
   offset: u8
+}
+
+impl fmt::Debug for Stack {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_list().entries(self.items.iter().take(self.offset as usize)).finish()
+  }
 }
 
 impl Stack {
@@ -82,6 +90,7 @@ impl Process {
 
   pub fn run(&mut self) -> bool {
     let instruction = &self.program[self.pc];
+    self.pc += 1;
 
     let stack = &mut self.stack;
 
@@ -109,7 +118,7 @@ impl Process {
       },
       Opcode::Discard => { stack.pop(); },
       Opcode::Clone => if let Some(item) = stack.peek() { stack.push(item) },
-      Opcode::Debug => if let Some(item) = stack.peek() { println!("{:?}", item) }
+      Opcode::Debug => println!("{:?}", stack),
       Opcode::Push => {
         let item = first(stack);
         stack.push(item)
@@ -122,9 +131,25 @@ impl Process {
         StackValue::Int(x) => stack.push(StackValue::Float(x as f64)),
         StackValue::Float(x) => stack.push(StackValue::Float(x)),
       },
+      Opcode::Jump => match (first(stack), second(stack)) {
+        (StackValue::Int(pc), StackValue::Int(cond)) if pc >= 0 => if cond != 0 {
+          self.pc = pc as usize
+        },
+        _ => panic!("invalid jump")
+      },
+      Opcode::Swap => {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(a);
+        stack.push(b);
+      },
+      Opcode::Over => {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(b);
+        stack.push(a);
+        stack.push(b);
+      },
     };
 
-    self.pc += 1;
     return self.pc < self.program.len();
   }
 }

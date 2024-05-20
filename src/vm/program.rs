@@ -11,7 +11,10 @@ pub enum Opcode {
   Debug,
   Push,
   Int,
-  Float
+  Float,
+  Jump,
+  Swap,
+  Over
 }
 
 #[derive(Clone, Debug, Copy)]
