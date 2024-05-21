@@ -29,6 +29,7 @@ impl Machine {
     let internal = self.0.clone();
     let mut process = Process::new(program);
 
+    internal.active.fetch_add(1, Ordering::Relaxed);
     thread::spawn(move || {
       let memory = Mutex::new(Memory::new(1024));
       let mut mounted_memory: MutexGuard<Memory> = memory.lock().unwrap();
