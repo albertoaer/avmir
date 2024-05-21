@@ -1,6 +1,6 @@
 use std::{env::args, fs};
 
-use crate::{parser::{Parser, simple}, vm::{machine::Machine, process::Process}};
+use crate::{parser::{Parser, simple}, vm::machine::Machine};
 
 mod vm;
 mod parser;
@@ -14,8 +14,7 @@ fn main() {
             Ok(program) => program,
             Err(err) => panic!("{}", err)
         };
-        let process = Process::new(program);
-        machine.launch(process);
+        machine.launch(program);
     }
 
     machine.wait();
