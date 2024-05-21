@@ -8,12 +8,20 @@ pub enum StackValue {
   Float(f64)
 }
 
-macro_rules! same_type {
-  ($op: tt => $a: expr, $b: expr) => {
+macro_rules! same_type_op {
+  ($a: ident $op: tt $b: ident) => {
     match ($a, $b) {
       (StackValue::Int(x), StackValue::Int(y)) => StackValue::Int(x $op y),
       (StackValue::Float(x), StackValue::Float(y)) => StackValue::Float(x $op y),
-      _ => panic!("Unexpected case")
+      _ => panic!("operands must be same type")
+    }
+  };
+
+  (($output: path => $cast: ty) $a: ident $op: tt $b: ident) => {
+    match ($a, $b) {
+      (StackValue::Int(x), StackValue::Int(y)) => $output((x $op y) as $cast),
+      (StackValue::Float(x), StackValue::Float(y)) => $output((x $op y) as $cast),
+      _ => panic!("operands must be same type")
     }
   };
 }
@@ -102,20 +110,46 @@ impl Process {
     match instruction.0 {
       Opcode::Add => {
         let (a, b) = (first(stack), second(stack));
-        stack.push(same_type!(+ => a, b));
+        stack.push(same_type_op!(a + b));
       },
       Opcode::Sub => {
         let (a, b) = (first(stack), second(stack));
-        stack.push(same_type!(- => a, b));
+        stack.push(same_type_op!(a - b));
       },
       Opcode::Mul => {
         let (a, b) = (first(stack), second(stack));
-        stack.push(same_type!(* => a, b));
+        stack.push(same_type_op!(a * b));
       },
       Opcode::Div => {
         let (a, b) = (first(stack), second(stack));
-        stack.push(same_type!(/ => a, b));
+        stack.push(same_type_op!(a / b));
       },
+
+      Opcode::Gt => {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(same_type_op!((StackValue::Int => i64) a > b));
+      }
+      Opcode::Ls => {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(same_type_op!((StackValue::Int => i64) a < b));
+      }
+      Opcode::Gteq =>  {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(same_type_op!((StackValue::Int => i64) a >= b));
+      }
+      Opcode::Lseq =>  {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(same_type_op!((StackValue::Int => i64) a <= b));
+      }
+      Opcode::Eq =>  {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(same_type_op!((StackValue::Int => i64) a == b));
+      }
+      Opcode::Noteq =>  {
+        let (a, b) = (first(stack), second(stack));
+        stack.push(same_type_op!((StackValue::Int => i64) a != b));
+      }
+
       Opcode::Discard => { stack.pop(); },
       Opcode::Clone => if let Some(item) = stack.peek() { stack.push(item) },
       Opcode::Debug => println!("{:?}", stack),

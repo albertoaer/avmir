@@ -6,6 +6,14 @@ pub enum Opcode {
   Sub,
   Mul,
   Div,
+
+  Gt,
+  Ls,
+  Gteq,
+  Lseq,
+  Eq,
+  Noteq,
+
   Discard,
   Clone,
   Debug,
