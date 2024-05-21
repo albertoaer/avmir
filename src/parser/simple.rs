@@ -36,8 +36,8 @@ fn parse_instruction(line: &str) -> Result<Instruction, InternalSimpleParserErro
   let items: Vec<_> = line.split(' ').filter(|x| !x.is_empty()).collect();
   Ok(match items.as_slice() {
     &[a] => Instruction::new(Opcode::from_str(a)?),
-    &[a, b] => Instruction::new_args(Opcode::from_str(a)?, parse_operand(b)?, None),
-    &[a, b, c] => Instruction::new_args(
+    &[a, b] => Instruction::with_args(Opcode::from_str(a)?, parse_operand(b)?, None),
+    &[a, b, c] => Instruction::with_args(
       Opcode::from_str(a)?, parse_operand(b)?, parse_operand(c)?
     ),
     _ => return Err(InternalSimpleParserError::BadLineSyntax(line.to_owned()))

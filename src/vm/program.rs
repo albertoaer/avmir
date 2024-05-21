@@ -27,7 +27,8 @@ pub enum Opcode {
   WriteInt64,
   ReadInt64,
   Mount,
-  Unmount
+  Unmount,
+  Fork
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -44,7 +45,7 @@ impl Instruction {
     Instruction(opcode, None, None)
   }
 
-  pub fn new_args(opcode: Opcode, first: Option<InstructionParam>, second: Option<InstructionParam>) -> Instruction {
+  pub fn with_args(opcode: Opcode, first: Option<InstructionParam>, second: Option<InstructionParam>) -> Instruction {
     Instruction(opcode, first, second)
   }
 }

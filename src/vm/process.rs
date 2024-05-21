@@ -22,26 +22,34 @@ pub trait ProcesSupervisor {
   fn set_memory(&mut self, unit: Option<usize>);
   fn memory<T>(&self, effect: impl FnOnce(&Memory) -> T) -> T;
   fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T;
+  fn fork(&self, process: Process);
 }
 
-pub struct Process<'a, T> {
+#[derive(Clone)]
+pub struct Process {
   program: Program,
   pc: usize,
-  stack: Stack,
-  supervisor: &'a mut T
+  stack: Stack
 }
 
-impl<'a, T: ProcesSupervisor> Process<'a, T> {
-  pub fn new(program: Program, supervisor: &'a mut T) -> Self {
+impl Process {
+  pub fn new(program: Program) -> Self {
     Process {
       program,
       pc: 0,
-      stack: Stack::new(),
-      supervisor
+      stack: Stack::new()
     }
   }
 
-  pub fn run(&mut self) -> bool {
+  pub fn program(&self) -> &Program {
+    &self.program
+  }
+
+  pub fn is_finished(&self) -> bool {
+    self.pc >= self.program.len()
+  }
+
+  pub fn run(&mut self, supervisor: &mut impl ProcesSupervisor) -> bool {
     let instruction = &self.program[self.pc];
     self.pc += 1;
 
@@ -132,21 +140,29 @@ impl<'a, T: ProcesSupervisor> Process<'a, T> {
         
       Opcode::WriteInt64 => match (arg!(1), arg!(2)) {
         (StackValue::Int(address), StackValue::Int(value)) =>
-          self.supervisor.memory_mut(|memory| memory.write_int_64(value, address as usize)),
+          supervisor.memory_mut(|memory| memory.write_int_64(value, address as usize)),
         _ => panic!("expecting: address :: int, value :: int")
       }
       Opcode::ReadInt64 => match arg!(1) {
         StackValue::Int(address) =>
-          stack.push(StackValue::Int(self.supervisor.memory(|memory| memory.read_int_64(address as usize)))),
+          stack.push(StackValue::Int(supervisor.memory(|memory| memory.read_int_64(address as usize)))),
         _ => panic!("expecting: address :: int")
       }
       Opcode::Mount => match arg!(1) {
-        StackValue::Int(unit) if unit >= 0 => self.supervisor.set_memory(Some(unit as usize)),
+        StackValue::Int(unit) if unit >= 0 => supervisor.set_memory(Some(unit as usize)),
         _ => panic!("expecting: unit :: int >= 0")
       }
-      Opcode::Unmount => self.supervisor.set_memory(None),
+      Opcode::Unmount => supervisor.set_memory(None),
+      Opcode::Fork => match arg!(1) {
+        StackValue::Int(pc_offset) => {
+          let mut cloned = self.clone();
+          cloned.pc = (cloned.pc as i64 + pc_offset) as usize;
+          supervisor.fork(cloned)
+        },
+        _ => panic!("expecting: pc_offset :: int")
+      }
     };
 
-    return self.pc < self.program.len();
+    self.is_finished()
   }
 }

@@ -20,10 +20,35 @@ impl MachineInternal {
 
 pub struct Machine(Arc<MachineInternal>);
 
+#[derive(Clone)]
 struct MachineProcessSupervisor {
-  memory: Memory,
   machine: Arc<MachineInternal>,
+  memory: Memory,
   external_memory: Option<Arc<RwLock<Memory>>>
+}
+
+impl MachineProcessSupervisor {
+  pub fn new(machine: Arc<MachineInternal>, memory: Memory) -> Self {
+    MachineProcessSupervisor {
+      machine,
+      memory,
+      external_memory: None
+    }
+  }
+
+  pub fn launch(mut self, mut process: Process) {
+    if process.is_finished() {
+      return
+    }
+
+    self.machine.active.fetch_add(1, Ordering::Relaxed);
+
+    thread::spawn(move || {
+      while !process.run(&mut self) { }
+      
+      self.machine.active.fetch_sub(1, Ordering::Relaxed);
+    });
+  }
 }
 
 impl ProcesSupervisor for MachineProcessSupervisor {
@@ -47,6 +72,10 @@ impl ProcesSupervisor for MachineProcessSupervisor {
       None => effect(&mut self.memory)
     }
   }
+  
+  fn fork(&self, process: Process) {
+    self.clone().launch(process)
+  }
 }
 
 impl Machine {
@@ -55,21 +84,8 @@ impl Machine {
   }
 
   pub fn launch(&mut self, program: Program) {
-    let internal = self.0.clone();
-    let mut supervisor = MachineProcessSupervisor{
-      memory: Memory::new(1024),
-      machine: internal.clone(),
-      external_memory: None
-    };
-    
-    internal.active.fetch_add(1, Ordering::Relaxed);
-    thread::spawn(move || {
-
-      let mut process = Process::new(program, &mut supervisor);
-      while process.run() { }
-      
-      internal.active.fetch_sub(1, Ordering::Relaxed);
-    });
+    MachineProcessSupervisor::new(self.0.clone(), Memory::new(1024))
+      .launch(Process::new(program));
   }
 
   pub fn wait(&mut self) {
