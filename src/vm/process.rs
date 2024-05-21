@@ -1,4 +1,4 @@
-use super::{stack::{Stack, StackValue}, memory::Memory, program::{Opcode, Program}};
+use super::{memory::Memory, program::{Instruction, Opcode}, stack::{Stack, StackValue}};
 
 macro_rules! same_type_op {
   ($a: ident $op: tt $b: ident) => {
@@ -27,22 +27,18 @@ pub trait ProcesSupervisor {
 
 #[derive(Clone)]
 pub struct Process {
-  program: Program,
+  program: Vec<Instruction>,
   pc: usize,
   stack: Stack
 }
 
 impl Process {
-  pub fn new(program: Program) -> Self {
+  pub fn new(program: Vec<Instruction>) -> Self {
     Process {
       program,
       pc: 0,
       stack: Stack::new()
     }
-  }
-
-  pub fn program(&self) -> &Program {
-    &self.program
   }
 
   pub fn is_finished(&self) -> bool {

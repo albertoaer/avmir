@@ -10,6 +10,15 @@ impl Memory {
     }
   }
 
+  pub fn with_content(mut content: Vec<u8>, size: usize) -> Self {
+    if content.len() < size {
+      content.resize(size, 0)
+    }
+    Memory {
+      raw: content
+    }
+  }
+
   pub fn size(&self) -> usize {
     self.raw.len()
   }

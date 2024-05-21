@@ -57,7 +57,16 @@ impl Parser for Simple {
       if line.is_empty() {
         continue;
       }
-      program.push(parse_instruction(line).map_err(|err| SimpleParserError(idx + 1, err))?);
+      
+      if line.starts_with("#") {
+        let begin = program.static_data.len();
+        program.static_data.extend_from_slice(&line.as_bytes()[1..]);
+        let end = program.static_data.len();
+        program.static_data_meta.push((begin, end));
+        continue
+      }
+
+      program.instructions.push(parse_instruction(line).map_err(|err| SimpleParserError(idx + 1, err))?);
     }
     Ok(program)
   }

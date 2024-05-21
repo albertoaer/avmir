@@ -50,4 +50,19 @@ impl Instruction {
   }
 }
 
-pub type Program = Vec<Instruction>;
+#[derive(Debug, Clone)]
+pub struct Program {
+  pub instructions: Vec<Instruction>,
+  pub static_data: Vec<u8>,
+  pub static_data_meta: Vec<(usize, usize)>
+}
+
+impl Program {
+  pub fn new() -> Program {
+    Program {
+      instructions: Vec::new(),
+      static_data: Vec::new(),
+      static_data_meta: Vec::new()
+    }
+  }
+}

@@ -84,8 +84,8 @@ impl Machine {
   }
 
   pub fn launch(&mut self, program: Program) {
-    MachineProcessSupervisor::new(self.0.clone(), Memory::new(1024))
-      .launch(Process::new(program));
+    MachineProcessSupervisor::new(self.0.clone(), Memory::with_content(program.static_data, 1024))
+      .launch(Process::new(program.instructions));
   }
 
   pub fn wait(&mut self) {
