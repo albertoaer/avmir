@@ -22,7 +22,7 @@ impl Memory {
     self.raw[offset..8].copy_from_slice(&int.to_le_bytes());
   }
 
-  pub fn read_int_64(&mut self, offset: usize) -> i64 {
+  pub fn read_int_64(&self, offset: usize) -> i64 {
     i64::from_le_bytes(self.raw[offset..8].try_into().unwrap())
   }
 }

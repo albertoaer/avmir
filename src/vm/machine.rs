@@ -1,10 +1,10 @@
-use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}, thread, time::Duration};
+use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, RwLock}, thread, time::Duration};
 
 use super::{memory::Memory, process::{ProcesSupervisor, Process}, program::Program};
 
 struct MachineInternal {
   active: Arc<AtomicUsize>,
-  buffers: Vec<Arc<Mutex<Memory>>>
+  buffers: Vec<Arc<RwLock<Memory>>>
 }
 
 impl MachineInternal {
@@ -12,7 +12,7 @@ impl MachineInternal {
     MachineInternal {
       active: Arc::new(AtomicUsize::new(0)),
       buffers: vec![
-        Arc::new(Mutex::new(Memory::new(1024)))
+        Arc::new(RwLock::new(Memory::new(1024)))
       ]
     }
   }
@@ -23,7 +23,7 @@ pub struct Machine(Arc<MachineInternal>);
 struct MachineProcessSupervisor {
   memory: Memory,
   machine: Arc<MachineInternal>,
-  external_memory: Option<Arc<Mutex<Memory>>>
+  external_memory: Option<Arc<RwLock<Memory>>>
 }
 
 impl ProcesSupervisor for MachineProcessSupervisor {
@@ -34,9 +34,16 @@ impl ProcesSupervisor for MachineProcessSupervisor {
     }
   }
 
-  fn memory<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T {
+  fn memory<T>(&self, effect: impl FnOnce(&Memory) -> T) -> T {
     match &self.external_memory {
-      Some(external) => effect(&mut external.lock().unwrap()),
+      Some(external) => effect(&external.read().unwrap()),
+      None => effect(&self.memory)
+    }
+  }
+
+  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T {
+    match &self.external_memory {
+      Some(external) => effect(&mut external.write().unwrap()),
       None => effect(&mut self.memory)
     }
   }

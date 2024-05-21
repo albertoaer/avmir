@@ -20,7 +20,8 @@ macro_rules! same_type_op {
 
 pub trait ProcesSupervisor {
   fn set_memory(&mut self, unit: Option<usize>);
-  fn memory<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T;
+  fn memory<T>(&self, effect: impl FnOnce(&Memory) -> T) -> T;
+  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T;
 }
 
 pub struct Process<'a, T> {
@@ -131,7 +132,7 @@ impl<'a, T: ProcesSupervisor> Process<'a, T> {
         
       Opcode::WriteInt64 => match (arg!(1), arg!(2)) {
         (StackValue::Int(address), StackValue::Int(value)) =>
-          self.supervisor.memory(|memory| memory.write_int_64(value, address as usize)),
+          self.supervisor.memory_mut(|memory| memory.write_int_64(value, address as usize)),
         _ => panic!("expecting: address :: int, value :: int")
       }
       Opcode::ReadInt64 => match arg!(1) {
