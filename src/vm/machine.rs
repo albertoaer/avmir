@@ -1,6 +1,6 @@
-use std::{borrow::BorrowMut, sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex, MutexGuard}, thread, time::Duration};
+use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex}, thread, time::Duration};
 
-use super::{memory::Memory, process::Process, program::Program};
+use super::{memory::Memory, process::{ProcesSupervisor, Process}, program::Program};
 
 struct MachineInternal {
   active: Arc<AtomicUsize>,
@@ -20,6 +20,28 @@ impl MachineInternal {
 
 pub struct Machine(Arc<MachineInternal>);
 
+struct MachineProcessSupervisor {
+  memory: Memory,
+  machine: Arc<MachineInternal>,
+  external_memory: Option<Arc<Mutex<Memory>>>
+}
+
+impl ProcesSupervisor for MachineProcessSupervisor {
+  fn set_memory(&mut self, unit: Option<usize>) {
+    self.external_memory = match unit {
+      Some(idx) => Some(self.machine.buffers[idx].clone()),
+      None => None,
+    }
+  }
+
+  fn memory<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T {
+    match &self.external_memory {
+      Some(external) => effect(&mut external.lock().unwrap()),
+      None => effect(&mut self.memory)
+    }
+  }
+}
+
 impl Machine {
   pub fn new() -> Self {
     Machine(Arc::new(MachineInternal::new()))
@@ -27,23 +49,18 @@ impl Machine {
 
   pub fn launch(&mut self, program: Program) {
     let internal = self.0.clone();
-    let mut process = Process::new(program);
-
+    let mut supervisor = MachineProcessSupervisor{
+      memory: Memory::new(1024),
+      machine: internal.clone(),
+      external_memory: None
+    };
+    
     internal.active.fetch_add(1, Ordering::Relaxed);
     thread::spawn(move || {
-      let memory = Mutex::new(Memory::new(1024));
-      let mut mounted_memory: MutexGuard<Memory> = memory.lock().unwrap();
-      let mut mounted_unit = None;
-      while process.run(mounted_memory.borrow_mut()) {
-        if mounted_unit != process.external_unit() {
-          mounted_unit = process.external_unit();
-          mounted_memory = match mounted_unit {
-            Some(idx) if idx < internal.buffers.len() => internal.buffers[idx].lock().unwrap(),
-            None => memory.lock().unwrap(),
-            _ => panic!("unit does not exists")
-          }
-        }
-      }
+
+      let mut process = Process::new(program, &mut supervisor);
+      while process.run() { }
+      
       internal.active.fetch_sub(1, Ordering::Relaxed);
     });
   }
