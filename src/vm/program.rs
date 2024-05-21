@@ -22,7 +22,10 @@ pub enum Opcode {
   Float,
   Jump,
   Swap,
-  Over
+  Over,
+
+  WriteInt64,
+  ReadInt64,
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -35,7 +38,7 @@ pub enum InstructionParam {
 pub struct Instruction(pub Opcode, pub Option<InstructionParam>, pub Option<InstructionParam>);
 
 impl Instruction {
-  pub fn new(opcode: Opcode) -> Instruction {
+  pub fn new(opcode: Opcode) -> Self {
     Instruction(opcode, None, None)
   }
 

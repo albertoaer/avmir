@@ -1,6 +1,6 @@
 use core::fmt;
 
-use super::program::{InstructionParam, Opcode, Program};
+use super::{memory::Memory, program::{InstructionParam, Opcode, Program}};
 
 #[derive(Clone, Debug, Copy)]
 pub enum StackValue {
@@ -84,7 +84,8 @@ impl Stack {
 pub struct Process {
   program: Program,
   pc: usize,
-  stack: Stack
+  stack: Stack,
+  memory: Memory
 }
 
 impl Process {
@@ -92,7 +93,8 @@ impl Process {
     Process {
       program,
       pc: 0,
-      stack: Stack::new()
+      stack: Stack::new(),
+      memory: Memory::new(1024)
     }
   }
 
@@ -102,51 +104,53 @@ impl Process {
 
     let stack = &mut self.stack;
 
-    let first = |stack: &mut Stack| instruction.1.and_then(|x| Some(x.into())).or_else(|| stack.pop())
-      .expect("expected first operand");
-    let second = |stack: &mut Stack| instruction.2.and_then(|x| Some(x.into())).or_else(|| stack.pop())
-      .expect("expected second operand");
+    macro_rules! arg {
+      ($idx: tt) => {
+        instruction.$idx.and_then(|x| Some(x.into())).or_else(|| stack.pop())
+          .expect(concat!("expecting argument ", $idx, " on line ", line!()))
+      };
+    }
 
     match instruction.0 {
       Opcode::Add => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!(a + b));
       },
       Opcode::Sub => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!(a - b));
       },
       Opcode::Mul => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!(a * b));
       },
       Opcode::Div => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!(a / b));
       },
 
       Opcode::Gt => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!((StackValue::Int => i64) a > b));
       }
       Opcode::Ls => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!((StackValue::Int => i64) a < b));
       }
       Opcode::Gteq =>  {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!((StackValue::Int => i64) a >= b));
       }
       Opcode::Lseq =>  {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!((StackValue::Int => i64) a <= b));
       }
       Opcode::Eq =>  {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!((StackValue::Int => i64) a == b));
       }
       Opcode::Noteq =>  {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!((StackValue::Int => i64) a != b));
       }
 
@@ -154,34 +158,44 @@ impl Process {
       Opcode::Clone => if let Some(item) = stack.peek() { stack.push(item) },
       Opcode::Debug => println!("{:?}", stack),
       Opcode::Push => {
-        let item = first(stack);
+        let item = arg!(1);
         stack.push(item)
       },
-      Opcode::Int => match first(stack) {
+      Opcode::Int => match arg!(1) {
         StackValue::Int(x) => stack.push(StackValue::Int(x)),
         StackValue::Float(x) => stack.push(StackValue::Int(x as i64)),
       },
-      Opcode::Float => match first(stack) {
+      Opcode::Float => match arg!(1) {
         StackValue::Int(x) => stack.push(StackValue::Float(x as f64)),
         StackValue::Float(x) => stack.push(StackValue::Float(x)),
       },
-      Opcode::Jump => match (first(stack), second(stack)) {
+      Opcode::Jump => match (arg!(1), arg!(2)) {
         (StackValue::Int(pc), StackValue::Int(cond)) if pc >= 0 => if cond != 0 {
           self.pc = pc as usize
         },
-        _ => panic!("invalid jump")
+        _ => panic!("expecting: pc :: int >= 0, cond :: int")
       },
       Opcode::Swap => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(a);
         stack.push(b);
       },
       Opcode::Over => {
-        let (a, b) = (first(stack), second(stack));
+        let (a, b) = (arg!(1), arg!(2));
         stack.push(b);
         stack.push(a);
         stack.push(b);
       },
+        
+      Opcode::WriteInt64 => match (arg!(1), arg!(2)) {
+        (StackValue::Int(address), StackValue::Int(value)) =>
+          self.memory.write_int_64(value, address as usize),
+        _ => panic!("expecting: address :: int, value :: int")
+      }
+      Opcode::ReadInt64 => match arg!(1) {
+        StackValue::Int(address) => stack.push(StackValue::Int(self.memory.read_int_64(address as usize))),
+        _ => panic!("expecting: address :: int")
+      }
     };
 
     return self.pc < self.program.len();
