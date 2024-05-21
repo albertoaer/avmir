@@ -20,26 +20,25 @@ pub enum InternalSimpleParserError {
   OpcodeNotFound(#[from] <Opcode as FromStr>::Err)
 }
 
-fn parse_operand(item: &str) -> Result<InstructionParam, InternalSimpleParserError> {
-  if let Ok(int) = item.parse() {
-    Ok(InstructionParam::Int(int))
+fn parse_operand(item: &str) -> Result<Option<InstructionParam>, InternalSimpleParserError> {
+  if item == "_" {
+    Ok(None)
+  } else if let Ok(int) = item.parse() {
+    Ok(Some(InstructionParam::Int(int)))
   } else if let Ok(float) = item.parse() {
-    Ok(InstructionParam::Float(float))
+    Ok(Some(InstructionParam::Float(float)))
   } else {
     Err(InternalSimpleParserError::OperandInvalidSyntax)
   }
 }
 
 fn parse_instruction(line: &str) -> Result<Instruction, InternalSimpleParserError> {
-  let items: Vec<_> = line.split(' ').collect();
+  let items: Vec<_> = line.split(' ').filter(|x| !x.is_empty()).collect();
   Ok(match items.as_slice() {
     &[a] => Instruction::new(Opcode::from_str(a)?),
-    &[a, b] => Instruction::new_args(Opcode::from_str(a)?, Some(parse_operand(b)?), None),
-    &[a, "_", b] => Instruction::new_args(
-      Opcode::from_str(a)?, None, Some(parse_operand(b)?)
-    ),
+    &[a, b] => Instruction::new_args(Opcode::from_str(a)?, parse_operand(b)?, None),
     &[a, b, c] => Instruction::new_args(
-      Opcode::from_str(a)?, Some(parse_operand(b)?), Some(parse_operand(c)?)
+      Opcode::from_str(a)?, parse_operand(b)?, parse_operand(c)?
     ),
     _ => return Err(InternalSimpleParserError::BadLineSyntax(line.to_owned()))
   })
