@@ -85,7 +85,7 @@ pub struct Process {
   program: Program,
   pc: usize,
   stack: Stack,
-  memory: Memory
+  external_unit: Option<usize>
 }
 
 impl Process {
@@ -94,11 +94,15 @@ impl Process {
       program,
       pc: 0,
       stack: Stack::new(),
-      memory: Memory::new(1024)
+      external_unit: None
     }
   }
 
-  pub fn run(&mut self) -> bool {
+  pub fn external_unit(&self) -> Option<usize> {
+    self.external_unit
+  }
+
+  pub fn run(&mut self, memory: &mut Memory) -> bool {
     let instruction = &self.program[self.pc];
     self.pc += 1;
 
@@ -189,13 +193,18 @@ impl Process {
         
       Opcode::WriteInt64 => match (arg!(1), arg!(2)) {
         (StackValue::Int(address), StackValue::Int(value)) =>
-          self.memory.write_int_64(value, address as usize),
+          memory.write_int_64(value, address as usize),
         _ => panic!("expecting: address :: int, value :: int")
       }
       Opcode::ReadInt64 => match arg!(1) {
-        StackValue::Int(address) => stack.push(StackValue::Int(self.memory.read_int_64(address as usize))),
+        StackValue::Int(address) => stack.push(StackValue::Int(memory.read_int_64(address as usize))),
         _ => panic!("expecting: address :: int")
       }
+      Opcode::Mount => match arg!(1) {
+        StackValue::Int(unit) if unit >= 0 => self.external_unit = Some(unit as usize),
+        _ => panic!("expecting: unit :: int >= 0")
+      }
+      Opcode::Unmount => self.external_unit = None,
     };
 
     return self.pc < self.program.len();

@@ -1,5 +1,3 @@
-use std::{io::Write, sync::{Arc, Mutex}};
-
 #[derive(Debug, Clone)]
 pub struct Memory {
   raw: Vec<u8>

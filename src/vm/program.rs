@@ -26,6 +26,8 @@ pub enum Opcode {
 
   WriteInt64,
   ReadInt64,
+  Mount,
+  Unmount
 }
 
 #[derive(Clone, Debug, Copy)]

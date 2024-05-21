@@ -7,3 +7,9 @@ edition = "2021"
 strum = "0.26"
 strum_macros = "0.26"
 thiserror = "1.0"
+
+[profile.dev]
+panic = 'abort'
+
+[profile.release]
+panic = 'abort'
