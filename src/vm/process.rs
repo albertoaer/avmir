@@ -20,8 +20,8 @@ macro_rules! same_type_op {
 
 pub trait ProcesSupervisor {
   fn set_memory(&mut self, unit: Option<usize>);
-  fn memory<T>(&self, effect: impl FnOnce(&Memory) -> T) -> T;
-  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T;
+  fn memory<T>(&self, effect: impl FnOnce(&dyn Memory) -> T) -> T;
+  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut dyn Memory) -> T) -> T;
   fn fork(&self, process: Process);
 }
 

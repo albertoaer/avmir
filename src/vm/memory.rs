@@ -1,11 +1,16 @@
+pub trait Memory: Send + Sync {
+  fn write_int_64(&mut self, int: i64, offset: usize);
+  fn read_int_64(&self, offset: usize) -> i64;
+}
+
 #[derive(Debug, Clone)]
-pub struct Memory {
+pub struct MemoryBuffer {
   raw: Vec<u8>
 }
 
-impl Memory {
+impl MemoryBuffer {
   pub fn new(size: usize) -> Self {
-    Memory {
+    MemoryBuffer {
       raw: vec![0; size]
     }
   }
@@ -14,7 +19,7 @@ impl Memory {
     if content.len() < size {
       content.resize(size, 0)
     }
-    Memory {
+    MemoryBuffer {
       raw: content
     }
   }
@@ -26,12 +31,14 @@ impl Memory {
   pub fn resize(&mut self, size: usize) {
     self.raw.resize(size, 0)
   }
+}
 
-  pub fn write_int_64(&mut self, int: i64, offset: usize) {
+impl Memory for MemoryBuffer {
+  fn write_int_64(&mut self, int: i64, offset: usize) {
     self.raw[offset..8].copy_from_slice(&int.to_le_bytes());
   }
 
-  pub fn read_int_64(&self, offset: usize) -> i64 {
+  fn read_int_64(&self, offset: usize) -> i64 {
     i64::from_le_bytes(self.raw[offset..8].try_into().unwrap())
   }
 }

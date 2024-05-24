@@ -1,34 +1,34 @@
 use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, RwLock}, thread, time::Duration};
 
-use super::{memory::Memory, process::{ProcesSupervisor, Process}, program::Program};
+use super::{memory::{Memory, MemoryBuffer}, process::{ProcesSupervisor, Process}, program::Program};
 
 struct MachineInternal {
-  active: Arc<AtomicUsize>,
-  buffers: Vec<Arc<RwLock<Memory>>>
+  active: AtomicUsize,
+  buffers: Vec<Arc<RwLock<dyn Memory>>>
 }
 
 impl MachineInternal {
   fn new() -> Self {
     MachineInternal {
-      active: Arc::new(AtomicUsize::new(0)),
-      buffers: vec![
-        Arc::new(RwLock::new(Memory::new(1024)))
-      ]
+      active: AtomicUsize::new(0),
+      buffers: vec![]
     }
   }
-}
 
-pub struct Machine(Arc<MachineInternal>);
+  pub fn add_memory(&mut self, memory: impl Memory + 'static) {
+    self.buffers.push(Arc::new(RwLock::new(memory)))
+  }
+}
 
 #[derive(Clone)]
 struct MachineProcessSupervisor {
   machine: Arc<MachineInternal>,
-  memory: Memory,
-  external_memory: Option<Arc<RwLock<Memory>>>
+  memory: MemoryBuffer,
+  external_memory: Option<Arc<RwLock<dyn Memory>>>
 }
 
 impl MachineProcessSupervisor {
-  pub fn new(machine: Arc<MachineInternal>, memory: Memory) -> Self {
+  pub fn new(machine: Arc<MachineInternal>, memory: MemoryBuffer) -> Self {
     MachineProcessSupervisor {
       machine,
       memory,
@@ -59,16 +59,16 @@ impl ProcesSupervisor for MachineProcessSupervisor {
     }
   }
 
-  fn memory<T>(&self, effect: impl FnOnce(&Memory) -> T) -> T {
+  fn memory<T>(&self, effect: impl FnOnce(&dyn Memory) -> T) -> T {
     match &self.external_memory {
-      Some(external) => effect(&external.read().unwrap()),
+      Some(external) => effect(& *external.read().unwrap()),
       None => effect(&self.memory)
     }
   }
 
-  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut Memory) -> T) -> T {
+  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut dyn Memory) -> T) -> T {
     match &self.external_memory {
-      Some(external) => effect(&mut external.write().unwrap()),
+      Some(external) => effect(&mut *external.write().unwrap()),
       None => effect(&mut self.memory)
     }
   }
@@ -78,13 +78,19 @@ impl ProcesSupervisor for MachineProcessSupervisor {
   }
 }
 
+pub struct Machine(Arc<MachineInternal>);
+
 impl Machine {
   pub fn new() -> Self {
     Machine(Arc::new(MachineInternal::new()))
   }
 
+  fn with_content(internal: MachineInternal) -> Self {
+    Machine(Arc::new(internal))
+  }
+
   pub fn launch(&mut self, program: Program) {
-    MachineProcessSupervisor::new(self.0.clone(), Memory::with_content(program.static_data, 1024))
+    MachineProcessSupervisor::new(self.0.clone(), MemoryBuffer::with_content(program.static_data, 1024))
       .launch(Process::new(program.instructions));
   }
 
@@ -93,5 +99,22 @@ impl Machine {
     while self.0.active.load(Ordering::Relaxed) > 0 {
       thread::sleep(DEFAULT_DURATION)
     }
+  }
+}
+
+pub struct MachineBuilder(MachineInternal);
+
+impl MachineBuilder {
+  pub fn new() -> Self {
+    MachineBuilder(MachineInternal::new())
+  }
+
+  pub fn add_memory(mut self, memory: impl Memory + 'static) -> Self {
+    self.0.add_memory(memory);
+    self
+  }
+
+  pub fn build(self) -> Machine {
+    Machine::with_content(self.0)
   }
 }
