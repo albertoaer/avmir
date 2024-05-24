@@ -1,6 +1,6 @@
 use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, RwLock}, thread, time::Duration};
 
-use super::{memory::{Memory, MemoryBuffer}, process::{ProcesSupervisor, Process}, program::Program};
+use super::{memory::Memory, process::{ProcesSupervisor, Process}, program::Program};
 
 struct MachineInternal {
   active: AtomicUsize,
@@ -23,12 +23,12 @@ impl MachineInternal {
 #[derive(Clone)]
 struct MachineProcessSupervisor {
   machine: Arc<MachineInternal>,
-  memory: MemoryBuffer,
+  memory: Vec<u8>,
   external_memory: Option<Arc<RwLock<dyn Memory>>>
 }
 
 impl MachineProcessSupervisor {
-  pub fn new(machine: Arc<MachineInternal>, memory: MemoryBuffer) -> Self {
+  pub fn new(machine: Arc<MachineInternal>, memory: Vec<u8>) -> Self {
     MachineProcessSupervisor {
       machine,
       memory,
@@ -90,7 +90,7 @@ impl Machine {
   }
 
   pub fn launch(&mut self, program: Program) {
-    MachineProcessSupervisor::new(self.0.clone(), MemoryBuffer::with_content(program.static_data, 1024))
+    MachineProcessSupervisor::new(self.0.clone(), program.memory())
       .launch(Process::new(program.instructions));
   }
 

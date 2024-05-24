@@ -50,11 +50,14 @@ impl Instruction {
   }
 }
 
+const DEFAULT_PROGRAM_MEMORY: usize = 1024;
+
 #[derive(Debug, Clone)]
 pub struct Program {
   pub instructions: Vec<Instruction>,
   pub static_data: Vec<u8>,
-  pub static_data_meta: Vec<(usize, usize)>
+  pub static_data_meta: Vec<(usize, usize)>,
+  pub required_memory: usize
 }
 
 impl Program {
@@ -62,7 +65,16 @@ impl Program {
     Program {
       instructions: Vec::new(),
       static_data: Vec::new(),
-      static_data_meta: Vec::new()
+      static_data_meta: Vec::new(),
+      required_memory: DEFAULT_PROGRAM_MEMORY
     }
+  }
+
+  pub fn memory(&self) -> Vec<u8> {
+    let mut memory = self.static_data.clone();
+    if memory.len() < self.required_memory {
+      memory.resize(self.required_memory, 0);
+    }
+    memory
   }
 }
