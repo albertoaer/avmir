@@ -25,7 +25,14 @@ pub enum Opcode {
   Over,
 
   WriteInt64,
+  WriteInt32,
+  WriteInt16,
+  WriteInt8,
   ReadInt64,
+  ReadInt32,
+  ReadInt16,
+  ReadInt8,
+
   Mount,
   Unmount,
   Fork
