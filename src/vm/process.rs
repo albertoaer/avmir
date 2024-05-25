@@ -1,4 +1,4 @@
-use super::{memory::Memory, program::{Opcode, Program}, stack::{Stack, StackValue}};
+use super::{memory::Memory, program::{Instruction, Opcode, Program}, stack::{Stack, StackValue}};
 
 macro_rules! same_type_op {
   ($a: ident $op: tt $b: ident) => {
@@ -45,10 +45,14 @@ impl Process {
     self.pc >= self.program.instructions.len()
   }
 
-  pub fn run(&mut self, supervisor: &mut impl ProcesSupervisor) -> bool {
-    let instruction = &self.program.instructions[self.pc];
-    self.pc += 1;
+  pub fn run_until_finish(&mut self, supervisor: &mut impl ProcesSupervisor) {
+    while let Some(&instruction) = self.program.instructions.get(self.pc) {
+      self.pc += 1;
+      self.run_current_instruction(supervisor, instruction)
+    }
+  }
 
+  pub fn run_current_instruction(&mut self, supervisor: &mut impl ProcesSupervisor, instruction: Instruction) {
     let stack = &mut self.stack;
 
     macro_rules! arg {
@@ -158,8 +162,6 @@ impl Process {
         _ => panic!("expecting: pc_offset :: int")
       }
     };
-
-    self.is_finished()
   }
 }
 

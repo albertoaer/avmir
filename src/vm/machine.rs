@@ -44,8 +44,7 @@ impl MachineProcessSupervisor {
     self.machine.active.fetch_add(1, Ordering::Relaxed);
 
     thread::spawn(move || {
-      while !process.run(&mut self) { }
-      
+      process.run_until_finish(&mut self);
       self.machine.active.fetch_sub(1, Ordering::Relaxed);
     });
   }
