@@ -1,4 +1,4 @@
-use super::{memory::Memory, program::{Instruction, Opcode}, stack::{Stack, StackValue}};
+use super::{memory::Memory, program::{Opcode, Program}, stack::{Stack, StackValue}};
 
 macro_rules! same_type_op {
   ($a: ident $op: tt $b: ident) => {
@@ -27,13 +27,13 @@ pub trait ProcesSupervisor {
 
 #[derive(Clone)]
 pub struct Process {
-  program: Vec<Instruction>,
+  program: Program,
   pc: usize,
   stack: Stack
 }
 
 impl Process {
-  pub fn new(program: Vec<Instruction>) -> Self {
+  pub fn new(program: Program) -> Self {
     Process {
       program,
       pc: 0,
@@ -42,11 +42,11 @@ impl Process {
   }
 
   pub fn is_finished(&self) -> bool {
-    self.pc >= self.program.len()
+    self.pc >= self.program.instructions.len()
   }
 
   pub fn run(&mut self, supervisor: &mut impl ProcesSupervisor) -> bool {
-    let instruction = &self.program[self.pc];
+    let instruction = &self.program.instructions[self.pc];
     self.pc += 1;
 
     let stack = &mut self.stack;
@@ -160,5 +160,11 @@ impl Process {
     };
 
     self.is_finished()
+  }
+}
+
+impl From<Program> for Process {
+  fn from(program: Program) -> Self {
+    Process::new(program)
   }
 }

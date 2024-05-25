@@ -91,7 +91,7 @@ impl Machine {
 
   pub fn launch(&mut self, program: Program) {
     MachineProcessSupervisor::new(self.0.clone(), program.memory())
-      .launch(Process::new(program.instructions));
+      .launch(program.into());
   }
 
   pub fn wait(&mut self) {
