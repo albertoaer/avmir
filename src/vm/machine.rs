@@ -1,16 +1,16 @@
-use std::{sync::{atomic::{AtomicUsize, Ordering}, Arc, RwLock}, thread, time::Duration};
+use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread};
 
 use super::{memory::Memory, process::{ProcesSupervisor, Process}, program::Program};
 
 struct MachineInternal {
-  active: AtomicUsize,
+  active: (Mutex<usize>, Condvar),
   buffers: Vec<Arc<RwLock<dyn Memory>>>
 }
 
 impl MachineInternal {
   fn new() -> Self {
     MachineInternal {
-      active: AtomicUsize::new(0),
+      active: (Mutex::new(0), Condvar::new()),
       buffers: vec![]
     }
   }
@@ -41,11 +41,12 @@ impl MachineProcessSupervisor {
       return
     }
 
-    self.machine.active.fetch_add(1, Ordering::Relaxed);
+    *self.machine.active.0.lock().unwrap() += 1;
 
     thread::spawn(move || {
       process.run_until_finish(&mut self);
-      self.machine.active.fetch_sub(1, Ordering::Relaxed);
+      *self.machine.active.0.lock().unwrap() -= 1;
+      self.machine.active.1.notify_all();
     });
   }
 }
@@ -94,9 +95,10 @@ impl Machine {
   }
 
   pub fn wait(&mut self) {
-    static DEFAULT_DURATION: Duration = Duration::from_millis(100);
-    while self.0.active.load(Ordering::Relaxed) > 0 {
-      thread::sleep(DEFAULT_DURATION)
+    let (count, process_ended) = &self.0.active;
+    let mut count_lock = count.lock().unwrap();
+    while *count_lock > 0 {
+      count_lock = process_ended.wait(count_lock).unwrap();
     }
   }
 }
