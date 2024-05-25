@@ -1,4 +1,4 @@
-use super::{memory::Memory, program::{Instruction, Opcode}, stack::{Stack, StackValue}};
+use super::{memory::Memory, program::{Instruction, Opcode, Program}, stack::{Stack, StackValue}};
 
 macro_rules! same_type_op {
   ($a: ident $op: tt $b: ident) => {
@@ -45,13 +45,13 @@ pub trait ProcesSupervisor {
 
 #[derive(Clone)]
 pub struct Process {
-  program: Vec<Instruction>,
+  program: Program,
   pc: usize,
   stack: Stack
 }
 
 impl Process {
-  pub fn new(program: Vec<Instruction>) -> Self {
+  pub fn new(program: Program) -> Self {
     Process {
       program,
       pc: 0,
@@ -60,13 +60,17 @@ impl Process {
   }
 
   pub fn is_finished(&self) -> bool {
-    self.pc >= self.program.len()
+    self.pc >= self.program.instructions.len()
   }
 
-  pub fn run(&mut self, supervisor: &mut impl ProcesSupervisor) -> bool {
-    let instruction = &self.program[self.pc];
-    self.pc += 1;
+  pub fn run_until_finish(&mut self, supervisor: &mut impl ProcesSupervisor) {
+    while let Some(&instruction) = self.program.instructions.get(self.pc) {
+      self.pc += 1;
+      self.run_current_instruction(supervisor, instruction)
+    }
+  }
 
+  pub fn run_current_instruction(&mut self, supervisor: &mut impl ProcesSupervisor, instruction: Instruction) {
     let stack = &mut self.stack;
 
     macro_rules! arg {
@@ -190,7 +194,11 @@ impl Process {
         _ => panic!("expecting: pc_offset :: int")
       }
     };
+  }
+}
 
-    self.is_finished()
+impl From<Program> for Process {
+  fn from(program: Program) -> Self {
+    Process::new(program)
   }
 }
