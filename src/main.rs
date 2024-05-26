@@ -2,8 +2,9 @@ use std::{fs::{self, OpenOptions}, io};
 
 use clap::Parser as ArgsParser;
 use memmap2::MmapOptions;
+use parser::simple::SimpleParserError;
 use thiserror::Error;
-use vm::machine::MachineBuilder;
+use vm::{machine::MachineBuilder, program::Program};
 
 use crate::{parser::{simple, Parser}, vm::machine::Machine};
 
@@ -14,7 +15,10 @@ mod args;
 #[derive(Debug, Error)]
 enum RuntimeError {
   #[error("io error: {0}")]
-  Fs(#[from] io::Error)
+  Fs(#[from] io::Error),
+
+  #[error("parse error: {0}")]
+  SimpleParser(#[from] SimpleParserError)
 }
 
 fn config_machine(args: &args::Args, mut builder: MachineBuilder) -> Result<MachineBuilder, RuntimeError> {
@@ -40,14 +44,12 @@ fn main() -> Result<(), RuntimeError> {
   let machine_builder = MachineBuilder::new();
   let mut machine: Machine = config_machine(&args, machine_builder)?.build();
 
-  for file in args.files {
-    let content = fs::read_to_string(file).expect("expecting file content");
-    let program = match simple::Simple::parse(content) {
-      Ok(program) => program,
-      Err(err) => panic!("{}", err)
-    };
-    machine.launch(program);
-  }
+  args.files.iter().map(|file| -> Result<Program, RuntimeError> {
+    let mut program = Program::with_name(&file);
+    let content = fs::read_to_string(file)?;
+    simple::Simple::parse(&mut program, content)?;
+    Ok(program)
+  }).collect::<Result<Vec<Program>, _>>()?.into_iter().for_each(|program| machine.launch(program));
 
   machine.wait();
 

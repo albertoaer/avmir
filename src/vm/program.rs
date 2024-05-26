@@ -72,6 +72,7 @@ const DEFAULT_PROGRAM_MEMORY: usize = 1024;
 
 #[derive(Debug, Clone)]
 pub struct Program {
+  pub name: String,
   pub instructions: Vec<Instruction>,
   pub static_data: Vec<u8>,
   pub static_data_meta: Vec<(usize, usize)>,
@@ -81,11 +82,18 @@ pub struct Program {
 impl Program {
   pub fn new() -> Program {
     Program {
+      name: String::new(),
       instructions: Vec::new(),
       static_data: Vec::new(),
       static_data_meta: Vec::new(),
       required_memory: DEFAULT_PROGRAM_MEMORY
     }
+  }
+
+  pub fn with_name(name: impl AsRef<str>) -> Program {
+    let mut program = Self::new();
+    program.name = name.as_ref().into();
+    program
   }
 
   pub fn memory(&self) -> Vec<u8> {

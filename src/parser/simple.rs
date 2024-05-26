@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{borrow::BorrowMut, str::FromStr};
 
 use thiserror::Error;
 
@@ -51,10 +51,11 @@ pub struct SimpleParserError(usize, InternalSimpleParserError);
 impl Parser for Simple {
   type Err = SimpleParserError;
 
-  fn parse(source: impl AsRef<str>) -> Result<Program, Self::Err> {
-    let mut program = Program::new();
+  fn parse(mut target: impl BorrowMut<Program>, source: impl AsRef<str>) -> Result<(), Self::Err> {
+    let program = target.borrow_mut();
+
     for (idx, line) in source.as_ref().lines().map(|l| l.trim()).enumerate() {
-      if line.is_empty() {
+      if line.is_empty() || line.starts_with(";") {
         continue;
       }
       
@@ -68,6 +69,6 @@ impl Parser for Simple {
 
       program.instructions.push(parse_instruction(line).map_err(|err| SimpleParserError(idx + 1, err))?);
     }
-    Ok(program)
+    Ok(())
   }
 }
