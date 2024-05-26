@@ -47,7 +47,8 @@ pub trait ProcesSupervisor {
 pub struct Process {
   program: Program,
   pc: usize,
-  stack: Stack
+  stack: Stack,
+  registers: [StackValue; 10]
 }
 
 impl Process {
@@ -55,7 +56,8 @@ impl Process {
     Process {
       program,
       pc: 0,
-      stack: Stack::new()
+      stack: Stack::new(),
+      registers: [StackValue::Int(0); 10]
     }
   }
 
@@ -154,6 +156,15 @@ impl Process {
         stack.push(b);
         stack.push(a);
         stack.push(b);
+      },
+
+      Opcode::Reg => match arg!(1) {
+        StackValue::Int(reg @ 0..=9) => stack.push(self.registers[reg as usize]),
+        _ => panic!("expecting: reg :: int in [0, 10)")
+      },
+      Opcode::RegSet => match (arg!(1), arg!(2)) {
+        (StackValue::Int(reg @ 0..=9), value) => self.registers[reg as usize] = value,
+        _ => panic!("expecting: reg :: int in [0, 10)")
       },
         
       Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64) write_int_64),

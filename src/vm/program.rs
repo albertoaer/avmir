@@ -24,6 +24,9 @@ pub enum Opcode {
   Swap,
   Over,
 
+  Reg,
+  RegSet,
+
   WriteInt64,
   ReadInt64,
 
