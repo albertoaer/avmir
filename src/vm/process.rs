@@ -68,11 +68,11 @@ impl Process {
   pub fn run_until_finish(&mut self, supervisor: &mut impl ProcesSupervisor) {
     while let Some(&instruction) = self.program.instructions.get(self.pc) {
       self.pc += 1;
-      self.run_current_instruction(supervisor, instruction)
+      self.run_instruction(supervisor, instruction)
     }
   }
 
-  pub fn run_current_instruction(&mut self, supervisor: &mut impl ProcesSupervisor, instruction: Instruction) {
+  pub fn run_instruction(&mut self, supervisor: &mut impl ProcesSupervisor, instruction: Instruction) {
     let stack = &mut self.stack;
 
     macro_rules! arg {
@@ -83,6 +83,8 @@ impl Process {
     }
 
     match instruction.0 {
+      Opcode::Noop => (),
+
       Opcode::Add => {
         let (a, b) = (arg!(1), arg!(2));
         stack.push(same_type_op!(a + b));
@@ -141,10 +143,10 @@ impl Process {
         StackValue::Float(x) => stack.push(StackValue::Float(x)),
       },
       Opcode::Jump => match (arg!(1), arg!(2)) {
-        (StackValue::Int(pc), StackValue::Int(cond)) if pc >= 0 => if cond != 0 {
+        (StackValue::Int(pc), StackValue::Int(cond)) => if cond != 0 {
           self.pc = pc as usize
         },
-        _ => panic!("expecting: pc :: int >= 0, cond :: int")
+        _ => panic!("expecting: pc :: int, cond :: int")
       },
       Opcode::Swap => {
         let (a, b) = (arg!(1), arg!(2));

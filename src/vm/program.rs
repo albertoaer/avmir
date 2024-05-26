@@ -2,6 +2,8 @@ use strum_macros::EnumString;
 
 #[derive(Clone, Debug, Copy, EnumString)]
 pub enum Opcode {
+  Noop,
+
   Add,
   Sub,
   Mul,
