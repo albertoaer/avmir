@@ -1,13 +1,15 @@
-use std::{env::args, fs::{self, OpenOptions}, io};
+use std::{fs::{self, OpenOptions}, io};
 
+use clap::Parser as ArgsParser;
 use memmap2::MmapOptions;
 use thiserror::Error;
 use vm::machine::MachineBuilder;
 
-use crate::{parser::{Parser, simple}, vm::machine::Machine};
+use crate::{parser::{simple, Parser}, vm::machine::Machine};
 
 mod vm;
 mod parser;
+mod args;
 
 #[derive(Debug, Error)]
 enum RuntimeError {
@@ -15,15 +17,30 @@ enum RuntimeError {
   Fs(#[from] io::Error)
 }
 
+fn config_machine(args: &args::Args, mut builder: MachineBuilder) -> Result<MachineBuilder, RuntimeError> {
+  for mem in args.memory.iter() {
+    builder = match mem {
+      args::MemoryInput::Virtual { size } => builder.add_memory(vec![0; *size]),
+      args::MemoryInput::FileMap { size, path } => {
+        let file = OpenOptions::new().read(true).write(true).create(true).open(path)?;
+        let size = *size as u64;
+        if file.metadata()?.len() < size {
+          file.set_len(size)?;
+        }
+        builder.add_memory(unsafe { MmapOptions::new().map_mut(&file)? })
+      }
+    }
+  }
+
+  Ok(builder)
+}
+
 fn main() -> Result<(), RuntimeError> {
-  let file = OpenOptions::new().read(true).write(true).create(true).open("./mem.bin")?;
-  file.set_len(1024)?;
+  let args = args::Args::parse();
+  let machine_builder = MachineBuilder::new();
+  let mut machine: Machine = config_machine(&args, machine_builder)?.build();
 
-  let mapped = unsafe { MmapOptions::new().map_mut(&file)? };
-
-  let mut machine: Machine = MachineBuilder::new().add_memory(mapped).build();
-
-  for file in args().skip(1) {
+  for file in args.files {
     let content = fs::read_to_string(file).expect("expecting file content");
     let program = match simple::Simple::parse(content) {
       Ok(program) => program,
