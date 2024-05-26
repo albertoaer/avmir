@@ -43,12 +43,14 @@ pub trait ProcesSupervisor {
   fn fork(&self, process: Process);
 }
 
+pub type Registers = [StackValue; 10];
+
 #[derive(Clone)]
 pub struct Process {
   program: Program,
   pc: usize,
   stack: Stack,
-  registers: [StackValue; 10]
+  registers: Registers
 }
 
 impl Process {
@@ -59,6 +61,10 @@ impl Process {
       stack: Stack::new(),
       registers: [StackValue::Int(0); 10]
     }
+  }
+
+  pub fn registers(&self) -> Registers {
+    self.registers.clone()
   }
 
   pub fn is_finished(&self) -> bool {
