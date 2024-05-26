@@ -180,6 +180,12 @@ impl Process {
         stack.push(value);
       }
 
+      Opcode::WriteFloat => mem!(supervisor msg_type(float) write(StackValue::Float => f64) write_float),
+      Opcode::ReadFloat => {
+        let value = mem!(supervisor read(StackValue::Float, f64) read_float);
+        stack.push(value);
+      }
+
       Opcode::Mount => match arg!(1) {
         StackValue::Int(unit) if unit >= 0 => supervisor.set_memory(Some(unit as usize)),
         _ => panic!("expecting: unit :: int >= 0")
