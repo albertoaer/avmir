@@ -18,6 +18,24 @@ macro_rules! same_type_op {
   };
 }
 
+macro_rules! mem {
+  ($supervisor: ident msg_type($msg_type_name: tt) write($stack_value: path => $cast: ty) $func: tt) => {
+    match (arg!(1), arg!(2)) {
+      (StackValue::Int(address), $stack_value(value)) =>
+        $supervisor.memory_mut(|memory| memory.$func(value as $cast, address as usize)),
+      _ => panic!(concat!("expecting: address :: int, value :: ", stringify!($msg_type_name)))
+    }
+  };
+
+  ($supervisor: ident read($stack_value: path, $cast: ty) $func: tt) => {
+    match arg!(1) {
+      StackValue::Int(address) =>
+        $stack_value($supervisor.memory(|memory| memory.$func(address as usize)) as $cast),
+      _ => panic!("expecting: address :: int")
+    }
+  };
+}
+
 pub trait ProcesSupervisor {
   fn set_memory(&mut self, unit: Option<usize>);
   fn memory<T>(&self, effect: impl FnOnce(&dyn Memory) -> T) -> T;
@@ -138,16 +156,36 @@ impl Process {
         stack.push(b);
       },
         
-      Opcode::WriteInt64 => match (arg!(1), arg!(2)) {
-        (StackValue::Int(address), StackValue::Int(value)) =>
-          supervisor.memory_mut(|memory| memory.write_int_64(value, address as usize)),
-        _ => panic!("expecting: address :: int, value :: int")
+      Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64) write_int_64),
+      Opcode::ReadInt64 => {
+        let value = mem!(supervisor read(StackValue::Int, i64) read_int_64);
+        stack.push(value);
       }
-      Opcode::ReadInt64 => match arg!(1) {
-        StackValue::Int(address) =>
-          stack.push(StackValue::Int(supervisor.memory(|memory| memory.read_int_64(address as usize)))),
-        _ => panic!("expecting: address :: int")
+
+      Opcode::WriteInt32 => mem!(supervisor msg_type(int) write(StackValue::Int => i32) write_int_32),
+      Opcode::ReadInt32 => {
+        let value = mem!(supervisor read(StackValue::Int, i64) read_int_32);
+        stack.push(value);
       }
+
+      Opcode::WriteInt16 => mem!(supervisor msg_type(int) write(StackValue::Int => i16) write_int_16),
+      Opcode::ReadInt16 => {
+        let value = mem!(supervisor read(StackValue::Int, i64) read_int_16);
+        stack.push(value);
+      }
+
+      Opcode::WriteInt8 => mem!(supervisor msg_type(int) write(StackValue::Int => i8) write_int_8),
+      Opcode::ReadInt8 => {
+        let value = mem!(supervisor read(StackValue::Int, i64) read_int_8);
+        stack.push(value);
+      }
+
+      Opcode::WriteFloat => mem!(supervisor msg_type(float) write(StackValue::Float => f64) write_float),
+      Opcode::ReadFloat => {
+        let value = mem!(supervisor read(StackValue::Float, f64) read_float);
+        stack.push(value);
+      }
+
       Opcode::Mount => match arg!(1) {
         StackValue::Int(unit) if unit >= 0 => supervisor.set_memory(Some(unit as usize)),
         _ => panic!("expecting: unit :: int >= 0")
