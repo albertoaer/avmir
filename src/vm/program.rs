@@ -41,8 +41,11 @@ pub enum Opcode {
   WriteInt8,
   ReadInt8,
 
-  WriteFloat,
-  ReadFloat,
+  WriteFloat64,
+  ReadFloat64,
+
+  WriteFloat32,
+  ReadFloat32,
 
   Mount,
   Unmount,
