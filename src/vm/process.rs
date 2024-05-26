@@ -19,18 +19,22 @@ macro_rules! same_type_op {
 }
 
 macro_rules! mem {
-  ($supervisor: ident msg_type($msg_type_name: tt) write($stack_value: path => $cast: ty) $func: tt) => {
+  ($supervisor: ident msg_type($msg_type_name: tt) write($stack_value: path => $cast: ty)) => {
     match (arg!(1), arg!(2)) {
       (StackValue::Int(address), $stack_value(value)) =>
-        $supervisor.memory_mut(|memory| memory.$func(value as $cast, address as usize)),
+        $supervisor.memory_mut(|memory| memory.write(address as usize, &(value as $cast).to_le_bytes())),
       _ => panic!(concat!("expecting: address :: int, value :: ", stringify!($msg_type_name)))
     }
   };
 
-  ($supervisor: ident read($stack_value: path, $cast: ty) $func: tt) => {
+  ($supervisor: ident read($stack_value: path, $read_type: ty => $cast: ty)) => {
     match arg!(1) {
       StackValue::Int(address) =>
-        $stack_value($supervisor.memory(|memory| memory.$func(address as usize)) as $cast),
+        $stack_value(
+          $supervisor.memory(|memory| <$read_type>::from_le_bytes(
+            memory.read(address as usize, std::mem::size_of::<$read_type>()).try_into().unwrap()
+          )) as $cast
+        ),
       _ => panic!("expecting: address :: int")
     }
   };
@@ -169,33 +173,39 @@ impl Process {
         _ => panic!("expecting: reg :: int in [0, 10)")
       },
         
-      Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64) write_int_64),
+      Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64)),
       Opcode::ReadInt64 => {
-        let value = mem!(supervisor read(StackValue::Int, i64) read_int_64);
+        let value = mem!(supervisor read(StackValue::Int, i64 => i64));
         stack.push(value);
       }
 
-      Opcode::WriteInt32 => mem!(supervisor msg_type(int) write(StackValue::Int => i32) write_int_32),
+      Opcode::WriteInt32 => mem!(supervisor msg_type(int) write(StackValue::Int => i32)),
       Opcode::ReadInt32 => {
-        let value = mem!(supervisor read(StackValue::Int, i64) read_int_32);
+        let value = mem!(supervisor read(StackValue::Int, i32 => i64));
         stack.push(value);
       }
 
-      Opcode::WriteInt16 => mem!(supervisor msg_type(int) write(StackValue::Int => i16) write_int_16),
+      Opcode::WriteInt16 => mem!(supervisor msg_type(int) write(StackValue::Int => i16)),
       Opcode::ReadInt16 => {
-        let value = mem!(supervisor read(StackValue::Int, i64) read_int_16);
+        let value = mem!(supervisor read(StackValue::Int, i16 => i64));
         stack.push(value);
       }
 
-      Opcode::WriteInt8 => mem!(supervisor msg_type(int) write(StackValue::Int => i8) write_int_8),
+      Opcode::WriteInt8 => mem!(supervisor msg_type(int) write(StackValue::Int => i8)),
       Opcode::ReadInt8 => {
-        let value = mem!(supervisor read(StackValue::Int, i64) read_int_8);
+        let value = mem!(supervisor read(StackValue::Int, i8 => i64));
         stack.push(value);
       }
 
-      Opcode::WriteFloat => mem!(supervisor msg_type(float) write(StackValue::Float => f64) write_float),
-      Opcode::ReadFloat => {
-        let value = mem!(supervisor read(StackValue::Float, f64) read_float);
+      Opcode::WriteFloat64 => mem!(supervisor msg_type(float) write(StackValue::Float => f64)),
+      Opcode::ReadFloat64 => {
+        let value = mem!(supervisor read(StackValue::Float, f64 => f64));
+        stack.push(value);
+      }
+
+      Opcode::WriteFloat32 => mem!(supervisor msg_type(float) write(StackValue::Float => f32)),
+      Opcode::ReadFloat32 => {
+        let value = mem!(supervisor read(StackValue::Float, f32 => f64));
         stack.push(value);
       }
 
