@@ -4,7 +4,7 @@ use clap::Parser as ArgsParser;
 use memmap2::MmapOptions;
 use parser::simple::SimpleParserError;
 use thiserror::Error;
-use vm::{machine::MachineBuilder, program::Program};
+use vm::{ffi::{FFIError, FFILoader}, machine::MachineBuilder, program::Program};
 
 use crate::{parser::{simple, Parser}, vm::machine::Machine};
 
@@ -18,7 +18,10 @@ enum RuntimeError {
   Fs(#[from] io::Error),
 
   #[error("parse error: {0}")]
-  SimpleParser(#[from] SimpleParserError)
+  SimpleParser(#[from] SimpleParserError),
+
+  #[error("{0}")]
+  FFIError(#[from] FFIError)
 }
 
 fn config_machine(args: &args::Args, mut builder: MachineBuilder) -> Result<MachineBuilder, RuntimeError> {
@@ -34,6 +37,10 @@ fn config_machine(args: &args::Args, mut builder: MachineBuilder) -> Result<Mach
         builder.add_memory(unsafe { MmapOptions::new().map_mut(&file)? })
       }
     }
+  }
+
+  for lib in args.library.iter() {
+    builder = builder.add_ffi_loader(unsafe { FFILoader::new(lib)? })
   }
 
   Ok(builder)

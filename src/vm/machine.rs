@@ -1,26 +1,31 @@
-use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread};
+use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread::{self, JoinHandle}};
 
-use super::{memory::Memory, process::{ProcesSupervisor, Process}, program::Program};
+use super::{ffi::{FFIInvoke, FFILoader}, memory::Memory, process::{ProcesSupervisor, Process, Registers}, program::Program, stack::StackValue};
 
 struct MachineInternal {
   active: (Mutex<usize>, Condvar),
-  buffers: Vec<Arc<RwLock<dyn Memory>>>
+  buffers: Vec<Arc<RwLock<dyn Memory>>>,
+  ffi: Vec<FFILoader>
 }
 
 impl MachineInternal {
   fn new() -> Self {
     MachineInternal {
       active: (Mutex::new(0), Condvar::new()),
-      buffers: vec![]
+      buffers: vec![],
+      ffi: vec![]
     }
   }
 
   pub fn add_memory(&mut self, memory: impl Memory + 'static) {
     self.buffers.push(Arc::new(RwLock::new(memory)))
   }
+
+  pub fn add_ffi_loader(&mut self, loader: FFILoader) {
+    self.ffi.push(loader)
+  }
 }
 
-#[derive(Clone)]
 struct MachineProcessSupervisor {
   machine: Arc<MachineInternal>,
   memory: Vec<u8>,
@@ -34,20 +39,6 @@ impl MachineProcessSupervisor {
       memory,
       external_memory: None
     }
-  }
-
-  pub fn launch(mut self, mut process: Process) {
-    if process.is_finished() {
-      return
-    }
-
-    *self.machine.active.0.lock().unwrap() += 1;
-
-    thread::spawn(move || {
-      process.run_until_finish(&mut self);
-      *self.machine.active.0.lock().unwrap() -= 1;
-      self.machine.active.1.notify_all();
-    });
   }
 }
 
@@ -72,10 +63,33 @@ impl ProcesSupervisor for MachineProcessSupervisor {
       None => effect(&mut self.memory)
     }
   }
-  
+
   fn fork(&self, process: Process) {
-    self.clone().launch(process)
+    launch(self.machine.clone(), process);
   }
+  
+  fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue> {
+    unsafe {
+      FFIInvoke::<fn (Registers) -> Option<StackValue>, _, _>::invoke_ffi(&self.machine.ffi, symbol, process.registers)
+    }.unwrap()
+  }
+}
+
+fn launch(machine: Arc<MachineInternal>, mut process: Process) -> Option<JoinHandle<Process>> {
+  if process.is_finished() {
+    return None
+  }
+
+  *machine.active.0.lock().unwrap() += 1;
+
+  Some(thread::spawn(move || {
+    let mut supervisor = MachineProcessSupervisor::new(machine, process.program.memory());
+
+    process.run_until_finish(&mut supervisor);
+    *supervisor.machine.active.0.lock().unwrap() -= 1;
+    supervisor.machine.active.1.notify_all();
+    process
+  }))
 }
 
 pub struct Machine(Arc<MachineInternal>);
@@ -90,8 +104,7 @@ impl Machine {
   }
 
   pub fn launch(&mut self, program: Program) {
-    MachineProcessSupervisor::new(self.0.clone(), program.memory())
-      .launch(program.into());
+    launch(self.0.clone(), program.into());
   }
 
   pub fn wait(&mut self) {
@@ -112,6 +125,11 @@ impl MachineBuilder {
 
   pub fn add_memory(mut self, memory: impl Memory + 'static) -> Self {
     self.0.add_memory(memory);
+    self
+  }
+
+  pub fn add_ffi_loader(mut self, loader: FFILoader) -> Self {
+    self.0.add_ffi_loader(loader);
     self
   }
 

@@ -45,16 +45,17 @@ pub trait ProcesSupervisor {
   fn memory<T>(&self, effect: impl FnOnce(&dyn Memory) -> T) -> T;
   fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut dyn Memory) -> T) -> T;
   fn fork(&self, process: Process);
+  fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue>;
 }
 
 pub type Registers = [StackValue; 10];
 
 #[derive(Clone)]
 pub struct Process {
-  program: Program,
-  pc: usize,
-  stack: Stack,
-  registers: Registers
+  pub program: Program,
+  pub pc: usize,
+  pub stack: Stack,
+  pub registers: Registers
 }
 
 impl Process {
@@ -65,10 +66,6 @@ impl Process {
       stack: Stack::new(),
       registers: [StackValue::Int(0); 10]
     }
-  }
-
-  pub fn registers(&self) -> Registers {
-    self.registers.clone()
   }
 
   pub fn is_finished(&self) -> bool {
@@ -137,27 +134,30 @@ impl Process {
         stack.push(same_type_op!((StackValue::Int => i64) a != b));
       }
 
-      Opcode::Discard => { stack.pop(); },
-      Opcode::Clone => if let Some(item) = stack.peek() { stack.push(item) },
+      Opcode::Discard => { stack.pop(); }
+      Opcode::Clone => {
+        let item = arg!(1);
+        stack.push(item)
+      }
       Opcode::Debug => println!("{:?}", stack),
       Opcode::Push => {
         let item = arg!(1);
         stack.push(item)
-      },
+      }
       Opcode::Int => match arg!(1) {
         StackValue::Int(x) => stack.push(StackValue::Int(x)),
         StackValue::Float(x) => stack.push(StackValue::Int(x as i64)),
-      },
+      }
       Opcode::Float => match arg!(1) {
         StackValue::Int(x) => stack.push(StackValue::Float(x as f64)),
         StackValue::Float(x) => stack.push(StackValue::Float(x)),
-      },
+      }
       Opcode::Jump => match (arg!(1), arg!(2)) {
         (StackValue::Int(pc), StackValue::Int(cond)) => if cond != 0 {
           self.pc = pc as usize
         },
         _ => panic!("expecting: pc :: int, cond :: int")
-      },
+      }
       Opcode::Swap => {
         let (a, b) = (arg!(1), arg!(2));
         stack.push(a);
@@ -168,16 +168,16 @@ impl Process {
         stack.push(b);
         stack.push(a);
         stack.push(b);
-      },
+      }
 
       Opcode::Reg => match arg!(1) {
         StackValue::Int(reg @ 0..=9) => stack.push(self.registers[reg as usize]),
         _ => panic!("expecting: reg :: int in [0, 10)")
-      },
+      }
       Opcode::RegSet => match (arg!(1), arg!(2)) {
         (StackValue::Int(reg @ 0..=9), value) => self.registers[reg as usize] = value,
         _ => panic!("expecting: reg :: int in [0, 10)")
-      },
+      }
         
       Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64)),
       Opcode::ReadInt64 => {
@@ -228,6 +228,13 @@ impl Process {
         },
         _ => panic!("expecting: pc_offset :: int")
       }
+      Opcode::Invoke => match (arg!(1), arg!(2)) {
+        (StackValue::Int(address), StackValue::Int(size)) => {
+          let outcome: Vec<u8> = supervisor.memory(|memory| memory.read(address as usize, size as usize).into());
+          supervisor.invoke_ffi(&outcome, self);
+        },
+        _ => panic!("expecting: address :: int, size :: int")
+      },
     };
   }
 }

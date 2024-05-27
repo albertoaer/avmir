@@ -1,45 +1,41 @@
 use libloading::{library_filename, Symbol};
+use thiserror::Error;
 
-use super::{memory::Memory, process::{ProcesSupervisor, Process, Registers}};
-
-pub trait FFITrap {
-  fn name(&self) -> &'static str;
-  fn handle(&self, process: &mut Process);
+#[derive(Debug, Error)]
+pub enum FFIError {
+  #[error("unable to find symbol")]
+  NotFound,
+  #[error("{0}")]
+  SymbolError(#[from] libloading::Error)
 }
 
-pub trait FFIFunction {
-  fn name(&self) -> &'static str;
-  fn call(&self, memory: &mut dyn Memory, registers: Registers);
+pub trait FFIInvoke<F, A, R> {
+  unsafe fn invoke_ffi(&self, symbol: &[u8], args: A) -> Result<R, FFIError> where F: Fn(A) -> R;
 }
 
-pub enum FFI {
-  Trap(Box<dyn FFITrap>),
-  Function(Box<dyn FFIFunction>)
-}
-
-impl FFI {
-  pub fn handle(&self, supervisor: &mut impl ProcesSupervisor, process: &mut Process) {
-    match self {
-      Self::Trap(trap) => trap.handle(process),
-      Self::Function(function) => supervisor.memory_mut(|memory| function.call(memory, process.registers())),
-    }
-  }
-}
-
+#[derive(Debug)]
 pub struct FFILoader(libloading::Library);
 
 impl FFILoader {
-  pub unsafe fn new(path: impl AsRef<str>) -> Result<Self, libloading::Error> {
+  pub unsafe fn new(path: impl AsRef<str>) -> Result<Self, FFIError> {
     Ok(Self(libloading::Library::new(library_filename(path.as_ref()))?))
   }
+}
 
-  pub unsafe fn load_ffi_trap(&self, name: &[u8]) -> FFI {
-    let symbol: Symbol<fn() -> *mut dyn FFITrap> = self.0.get(name).expect("expecting symbol");
-    FFI::Trap(Box::from_raw(symbol()))
+impl<F, A, R> FFIInvoke<F, A, R> for FFILoader {
+  unsafe fn invoke_ffi(&self, symbol: &[u8], args: A) -> Result<R, FFIError> where F: Fn(A) -> R {
+    let symbol: Symbol<F> = self.0.get(symbol)?;
+    Ok(symbol(args))
   }
+}
 
-  pub unsafe fn load_ffi_function(&self, name: &[u8]) -> FFI {
-    let symbol: Symbol<fn() -> *mut dyn FFIFunction> = self.0.get(name).expect("expecting symbol");
-    FFI::Function(Box::from_raw(symbol()))
+impl<F, A, R> FFIInvoke<F, A, R> for Vec<FFILoader> where A : Clone {
+  unsafe fn invoke_ffi(&self, symbol: &[u8], args: A) -> Result<R, FFIError> where F: Fn(A) -> R {
+    for loader in self.iter() {
+      if let Ok(result) = <FFILoader as FFIInvoke<F, A, R>>::invoke_ffi(loader, symbol, args.clone()) {
+        return Ok(result)
+      }
+    }
+    Err(FFIError::NotFound)
   }
 }
