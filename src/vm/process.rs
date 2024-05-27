@@ -132,11 +132,8 @@ impl Process {
         self.stack.push(same_type_op!((StackValue::Int => i64) a != b));
       }
 
-      Opcode::Discard => { let _ = arg!(1); }
-      Opcode::Clone => {
-        let item = arg!(1);
-        self.stack.push(item)
-      }
+      Opcode::Discard => { self.stack.pop(); }
+      Opcode::Clone => if let Some(item) = self.stack.peek() { self.stack.push(item) }
       Opcode::Debug => println!("{:?}", self.stack),
       Opcode::Push => {
         let item = arg!(1);
@@ -176,7 +173,7 @@ impl Process {
         (StackValue::Int(reg @ 0..=9), value) => self.registers[reg as usize] = value,
         _ => panic!("expecting: reg :: int in [0, 10)")
       }
-        
+
       Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64)),
       Opcode::ReadInt64 => {
         let value = mem!(supervisor read(StackValue::Int, i64 => i64));
