@@ -13,6 +13,9 @@ pub enum InternalSimpleParserError {
   #[error("operand invalid syntax")]
   OperandInvalidSyntax,
 
+  #[error("bad memory item: {0}")]
+  BadMemoryItem(usize),
+
   #[error("bad line syntax: {0}")]
   BadLineSyntax(String),
 
@@ -20,7 +23,22 @@ pub enum InternalSimpleParserError {
   OpcodeNotFound(#[from] <Opcode as FromStr>::Err)
 }
 
-fn parse_operand(item: &str) -> Result<Option<InstructionParam>, InternalSimpleParserError> {
+fn parse_operand(item: &str, program: &Program) -> Result<Option<InstructionParam>, InternalSimpleParserError> {
+  // get memory item address, size or next address
+  if item.starts_with("$") || item.starts_with("@") || item.starts_with("^") {
+    return if let Ok(idx) = item[1..].parse() {
+      match (item.chars().next().unwrap(), program.static_data_meta.get(idx)) {
+        ('$', Some((address, _))) => Ok(Some(InstructionParam::Int(*address as i64))),
+        ('@', Some((_, size))) => Ok(Some(InstructionParam::Int(*size as i64))),
+        (_, Some((address, size))) => Ok(Some(InstructionParam::Int((*address + *size) as i64))),
+        (_, None) => Err(InternalSimpleParserError::BadMemoryItem(idx))
+      }
+    } else {
+      Err(InternalSimpleParserError::OperandInvalidSyntax)
+    }
+  }
+
+  // default behaviour
   if item == "_" {
     Ok(None)
   } else if let Ok(int) = item.parse() {
@@ -32,13 +50,13 @@ fn parse_operand(item: &str) -> Result<Option<InstructionParam>, InternalSimpleP
   }
 }
 
-fn parse_instruction(line: &str) -> Result<Instruction, InternalSimpleParserError> {
+fn parse_instruction(line: &str, program: &Program) -> Result<Instruction, InternalSimpleParserError> {
   let items: Vec<_> = line.split(' ').filter(|x| !x.is_empty()).collect();
   Ok(match items.as_slice() {
     &[a] => Instruction::new(Opcode::from_str(a)?),
-    &[a, b] => Instruction::with_args(Opcode::from_str(a)?, parse_operand(b)?, None),
+    &[a, b] => Instruction::with_args(Opcode::from_str(a)?, parse_operand(b, program)?, None),
     &[a, b, c] => Instruction::with_args(
-      Opcode::from_str(a)?, parse_operand(b)?, parse_operand(c)?
+      Opcode::from_str(a)?, parse_operand(b, program)?, parse_operand(c, program)?
     ),
     _ => return Err(InternalSimpleParserError::BadLineSyntax(line.to_owned()))
   })
@@ -63,11 +81,11 @@ impl Parser for Simple {
         let begin = program.static_data.len();
         program.static_data.extend_from_slice(&line.as_bytes()[1..]);
         let end = program.static_data.len();
-        program.static_data_meta.push((begin, end));
+        program.static_data_meta.push((begin, end - begin));
         continue
       }
 
-      program.instructions.push(parse_instruction(line).map_err(|err| SimpleParserError(idx + 1, err))?);
+      program.instructions.push(parse_instruction(line, &program).map_err(|err| SimpleParserError(idx + 1, err))?);
     }
     Ok(())
   }
