@@ -8,8 +8,8 @@ use vm::{ffi::{FFIError, FFILoader}, machine::MachineBuilder, program::Program};
 
 use crate::{parser::{simple, Parser}, vm::machine::Machine};
 
-mod vm;
-mod parser;
+pub mod vm;
+pub mod parser;
 mod args;
 
 #[derive(Debug, Error)]
