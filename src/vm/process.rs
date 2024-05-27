@@ -48,14 +48,22 @@ pub trait ProcesSupervisor {
   fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue>;
 }
 
-pub type Registers = [StackValue; 10];
+pub const PUBLIC_REGISTERS_COUNT: usize = 10;
+pub const SPECIAL_REGISTERS_COUNT: usize = 4;
+pub const PRIVATE_REGISTERS_COUNT: usize = 10;
+pub const PROCESS_REGISTERS_COUNT: usize = PUBLIC_REGISTERS_COUNT + SPECIAL_REGISTERS_COUNT + PRIVATE_REGISTERS_COUNT;
+
+pub const REGISTER_FLAG_SHARE_MEMORY: usize = 0;
+
+pub type PublicRegisters = [StackValue; PUBLIC_REGISTERS_COUNT];
+pub type ProcessRegisters = [StackValue; PROCESS_REGISTERS_COUNT];
 
 #[derive(Clone)]
 pub struct Process {
   pub program: Program,
   pub pc: usize,
   pub stack: Stack,
-  pub registers: Registers
+  pub registers: ProcessRegisters
 }
 
 impl Process {
@@ -64,12 +72,19 @@ impl Process {
       program,
       pc: 0,
       stack: Stack::new(),
-      registers: [StackValue::Int(0); 10]
+      registers: [StackValue::Int(0); PROCESS_REGISTERS_COUNT]
     }
   }
 
   pub fn is_finished(&self) -> bool {
     self.pc >= self.program.instructions.len()
+  }
+
+  pub fn get_flag_share_memory(&self) -> bool {
+    let value: usize = self.registers[
+      PUBLIC_REGISTERS_COUNT + REGISTER_FLAG_SHARE_MEMORY
+    ].into();
+    value != 0
   }
 
   pub fn run_until_finish(&mut self, supervisor: &mut impl ProcesSupervisor) {
@@ -139,13 +154,13 @@ impl Process {
         let item = arg!(1);
         self.stack.push(item)
       }
-      Opcode::Int => match arg!(1) {
-        StackValue::Int(x) => self.stack.push(StackValue::Int(x)),
-        StackValue::Float(x) => self.stack.push(StackValue::Int(x as i64)),
+      Opcode::Int => {
+        let value = arg!(1).into();
+        self.stack.push(StackValue::Int(value))
       }
-      Opcode::Float => match arg!(1) {
-        StackValue::Int(x) => self.stack.push(StackValue::Float(x as f64)),
-        StackValue::Float(x) => self.stack.push(StackValue::Float(x)),
+      Opcode::Float => {
+        let value = arg!(1).into();
+        self.stack.push(StackValue::Float(value))
       }
       Opcode::Jump => match (arg!(1), arg!(2)) {
         (StackValue::Int(pc), StackValue::Int(cond)) => if cond != 0 {
@@ -166,12 +181,12 @@ impl Process {
       }
 
       Opcode::Reg => match arg!(1) {
-        StackValue::Int(reg @ 0..=9) => self.stack.push(self.registers[reg as usize]),
-        _ => panic!("expecting: reg :: int in [0, 10)")
+        StackValue::Int(reg) => self.stack.push(self.registers[reg as usize]),
+        _ => panic!("expecting: reg :: int")
       }
       Opcode::RegSet => match (arg!(1), arg!(2)) {
-        (StackValue::Int(reg @ 0..=9), value) => self.registers[reg as usize] = value,
-        _ => panic!("expecting: reg :: int in [0, 10)")
+        (StackValue::Int(reg), value) => self.registers[reg as usize] = value,
+        _ => panic!("expecting: registry :: int, value :: any")
       }
 
       Opcode::WriteInt64 => mem!(supervisor msg_type(int) write(StackValue::Int => i64)),

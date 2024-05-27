@@ -1,6 +1,11 @@
 use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread::{self, JoinHandle}};
 
-use super::{ffi::{FFIInvoke, FFILoader}, memory::Memory, process::{ProcesSupervisor, Process, Registers}, program::Program, stack::StackValue};
+use super::{
+  ffi::{invoke_ffi, invoke_ffi_memory, FFILoader},
+  memory::Memory,
+  process::{ProcesSupervisor, Process, PublicRegisters, PUBLIC_REGISTERS_COUNT},
+  program::Program, stack::StackValue
+};
 
 struct MachineInternal {
   active: (Mutex<usize>, Condvar),
@@ -69,9 +74,19 @@ impl ProcesSupervisor for MachineProcessSupervisor {
   }
   
   fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue> {
-    unsafe {
-      FFIInvoke::<fn (Registers) -> Option<StackValue>, _, _>::invoke_ffi(&self.machine.ffi, symbol, process.registers)
-    }.unwrap()
+    let registers = process.registers[0..PUBLIC_REGISTERS_COUNT].try_into().unwrap();
+    if !process.get_flag_share_memory() {
+      unsafe {
+        invoke_ffi(&self.machine.ffi, symbol, registers)
+      }.unwrap()
+    } else {
+      unsafe {
+          match &self.external_memory {
+          Some(external) => invoke_ffi_memory(&self.machine.ffi, symbol, registers, &mut *external.write().unwrap()),
+          None => invoke_ffi_memory(&self.machine.ffi, symbol, registers,  &mut self.memory)
+        }
+      }.unwrap()
+    }
   }
 }
 
