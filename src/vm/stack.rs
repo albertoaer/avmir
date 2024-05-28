@@ -18,6 +18,15 @@ impl From<InstructionParam> for StackValue {
   }
 }
 
+impl fmt::Display for StackValue {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      StackValue::Int(x) => x.fmt(f),
+      StackValue::Float(x) => x.fmt(f),
+    }
+  }
+}
+
 macro_rules! stack_value_cast_into {
   ($t: ty) => {
     impl Into<$t> for StackValue {

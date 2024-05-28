@@ -74,7 +74,7 @@ impl ProcesSupervisor for MachineProcessSupervisor {
   }
   
   fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue> {
-    let registers = process.registers[0..PUBLIC_REGISTERS_COUNT].try_into().unwrap();
+    let registers = &mut process.registers[0..PUBLIC_REGISTERS_COUNT].try_into().unwrap();
     if !process.get_flag_share_memory() {
       unsafe {
         invoke_ffi(&self.machine.ffi, symbol, registers)

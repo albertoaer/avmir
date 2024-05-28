@@ -20,22 +20,22 @@ impl FFILoader {
   }
 
   pub unsafe fn invoke_ffi(
-    &self, symbol: &[u8], registers: PublicRegisters
+    &self, symbol: &[u8], registers: &mut PublicRegisters
   ) -> Result<Option<StackValue>, FFIError> {
-    let symbol: Symbol<fn (PublicRegisters) -> Option<StackValue>> = self.0.get(symbol)?;
+    let symbol: Symbol<fn (&mut PublicRegisters) -> Option<StackValue>> = self.0.get(symbol)?;
     Ok(symbol(registers))
   }
 
   pub unsafe fn invoke_ffi_memory(
-    &self, symbol: &[u8], registers: PublicRegisters, memory: &mut dyn Memory
+    &self, symbol: &[u8], registers: &mut PublicRegisters, memory: &mut dyn Memory
   ) -> Result<Option<StackValue>, FFIError> {
-    let symbol: Symbol<fn (PublicRegisters, &mut dyn Memory) -> Option<StackValue>> = self.0.get(symbol)?;
+    let symbol: Symbol<fn (&mut PublicRegisters, &mut dyn Memory) -> Option<StackValue>> = self.0.get(symbol)?;
     Ok(symbol(registers, memory))
   }
 }
 
 pub unsafe fn invoke_ffi(
-  many: &[FFILoader], symbol: &[u8], registers: PublicRegisters
+  many: &[FFILoader], symbol: &[u8], registers: &mut PublicRegisters
 ) -> Result<Option<StackValue>, FFIError>{
   for loader in many.iter() {
     if let Ok(output) = loader.invoke_ffi(symbol, registers) {
@@ -46,7 +46,7 @@ pub unsafe fn invoke_ffi(
 }
 
 pub unsafe fn invoke_ffi_memory(
-  many: &[FFILoader], symbol: &[u8], registers: PublicRegisters, memory: &mut dyn Memory
+  many: &[FFILoader], symbol: &[u8], registers: &mut PublicRegisters, memory: &mut dyn Memory
 ) -> Result<Option<StackValue>, FFIError>{
   for loader in many.iter() {
     if let Ok(output) = loader.invoke_ffi_memory(symbol, registers, memory) {
