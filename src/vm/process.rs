@@ -63,7 +63,8 @@ pub struct Process {
   pub program: Program,
   pub pc: usize,
   pub stack: Stack,
-  pub registers: ProcessRegisters
+  pub registers: ProcessRegisters,
+  pub invoke_target: Vec<u8>
 }
 
 impl Process {
@@ -72,7 +73,8 @@ impl Process {
       program,
       pc: 0,
       stack: Stack::new(),
-      registers: [StackValue::Int(0); PROCESS_REGISTERS_COUNT]
+      registers: [StackValue::Int(0); PROCESS_REGISTERS_COUNT],
+      invoke_target: vec![]
     }
   }
 
@@ -238,10 +240,23 @@ impl Process {
         },
         _ => panic!("expecting: pc_offset :: int")
       }
-      Opcode::Invoke => match (arg!(1), arg!(2)) {
+      Opcode::PrepareInvoke => match (arg!(1), arg!(2)) {
         (StackValue::Int(address), StackValue::Int(size)) => {
-          let outcome: Vec<u8> = supervisor.memory(|memory| memory.read(address as usize, size as usize).into());
-          if let Some(value) = supervisor.invoke_ffi(&outcome, self) {
+          self.invoke_target = supervisor.memory(|memory| memory.read(address as usize, size as usize).into());
+        },
+        _ => panic!("expecting: address :: int, size :: int")
+      },
+      Opcode::Invoke => {
+        let invoke_target = self.invoke_target.clone();
+        if let Some(value) = supervisor.invoke_ffi(&invoke_target, self) {
+          self.stack.push(value);
+        }
+      },
+      Opcode::FastInvoke => match (arg!(1), arg!(2)) {
+        (StackValue::Int(address), StackValue::Int(size)) => {
+          let invoke_target: Vec<_> = supervisor.memory(|memory| memory.read(address as usize, size as usize).into());
+          self.invoke_target = invoke_target.clone();
+          if let Some(value) = supervisor.invoke_ffi(&invoke_target, self) {
             self.stack.push(value);
           }
         },

@@ -3,7 +3,7 @@ use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread::{self, JoinHandle}};
 use super::{
   ffi::{invoke_ffi, invoke_ffi_memory, FFILoader},
   memory::Memory,
-  process::{ProcesSupervisor, Process, PublicRegisters, PUBLIC_REGISTERS_COUNT},
+  process::{ProcesSupervisor, Process, PUBLIC_REGISTERS_COUNT},
   program::Program, stack::StackValue
 };
 
