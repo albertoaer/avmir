@@ -3,8 +3,12 @@ name = "avmir"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+path = "src/lib.rs"
+
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
+libloading = "0.8.3"
 memmap2 = "0.9.4"
 strum = "0.26"
 strum_macros = "0.26"
@@ -15,3 +19,6 @@ panic = 'abort'
 
 [profile.release]
 panic = 'abort'
+
+[workspace]
+members = ["libs/avmir_std"]

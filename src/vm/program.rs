@@ -49,7 +49,11 @@ pub enum Opcode {
 
   Mount,
   Unmount,
-  Fork
+  Fork,
+
+  PrepareInvoke,
+  Invoke,
+  FastInvoke
 }
 
 #[derive(Clone, Debug, Copy)]

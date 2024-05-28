@@ -42,6 +42,9 @@ pub struct Args {
   #[arg(short)]
   pub memory: Vec<MemoryInput>,
 
+  #[arg(short)]
+  pub library: Vec<String>,
+
   #[arg()]
   pub files: Vec<String>
 }

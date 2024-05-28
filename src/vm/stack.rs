@@ -18,6 +18,32 @@ impl From<InstructionParam> for StackValue {
   }
 }
 
+impl fmt::Display for StackValue {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      StackValue::Int(x) => x.fmt(f),
+      StackValue::Float(x) => x.fmt(f),
+    }
+  }
+}
+
+macro_rules! stack_value_cast_into {
+  ($t: ty) => {
+    impl Into<$t> for StackValue {
+      fn into(self) -> $t {
+        match self {
+          Self::Int(x) => x as $t,
+          Self::Float(x) => x as $t,
+        }
+      }
+    }
+  };
+}
+
+stack_value_cast_into!(usize);
+stack_value_cast_into!(i64);
+stack_value_cast_into!(f64);
+
 #[derive(Clone)]
 pub struct Stack {
   items: [StackValue; 32],
