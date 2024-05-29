@@ -1,4 +1,4 @@
-use super::{memory::Memory, program::{Instruction, Opcode, Program}, stack::{Stack, StackValue}};
+use super::{memory::MemoryHandler, program::{Instruction, Opcode, Program}, stack::{Stack, StackValue}};
 
 macro_rules! same_type_op {
   ($a: ident $op: tt $b: ident) => {
@@ -22,7 +22,7 @@ macro_rules! mem {
   ($supervisor: ident msg_type($msg_type_name: tt) write($stack_value: path => $cast: ty)) => {
     match (arg!(1), arg!(2)) {
       (StackValue::Int(address), $stack_value(value)) =>
-        $supervisor.memory_mut(|memory| memory.write(address as usize, &(value as $cast).to_le_bytes())),
+        $supervisor.get_memory().memory_mut(|memory| memory.write(address as usize, &(value as $cast).to_le_bytes())),
       _ => panic!(concat!("expecting: address :: int, value :: ", stringify!($msg_type_name)))
     }
   };
@@ -31,7 +31,7 @@ macro_rules! mem {
     match arg!(1) {
       StackValue::Int(address) =>
         $stack_value(
-          $supervisor.memory(|memory| <$read_type>::from_le_bytes(
+          $supervisor.get_memory().memory(|memory| <$read_type>::from_le_bytes(
             memory.read(address as usize, std::mem::size_of::<$read_type>()).try_into().unwrap()
           )) as $cast
         ),
@@ -42,8 +42,7 @@ macro_rules! mem {
 
 pub trait ProcesSupervisor {
   fn set_memory(&mut self, unit: Option<usize>);
-  fn memory<T>(&self, effect: impl FnOnce(&dyn Memory) -> T) -> T;
-  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut dyn Memory) -> T) -> T;
+  fn get_memory(&mut self) -> MemoryHandler;
   fn fork(&self, process: Process);
   fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue>;
 }
@@ -54,6 +53,7 @@ pub const PRIVATE_REGISTERS_COUNT: usize = 10;
 pub const PROCESS_REGISTERS_COUNT: usize = PUBLIC_REGISTERS_COUNT + SPECIAL_REGISTERS_COUNT + PRIVATE_REGISTERS_COUNT;
 
 pub const REGISTER_FLAG_SHARE_MEMORY: usize = 0;
+pub const REGISTER_FLAG_INVOKE_TRAP: usize = 1;
 
 pub type PublicRegisters = [StackValue; PUBLIC_REGISTERS_COUNT];
 pub type ProcessRegisters = [StackValue; PROCESS_REGISTERS_COUNT];
@@ -89,14 +89,35 @@ impl Process {
     value != 0
   }
 
-  pub fn run_until_finish(&mut self, supervisor: &mut impl ProcesSupervisor) {
+  pub fn get_flag_invoke_trap(&self) -> bool {
+    let value: usize = self.registers[
+      PUBLIC_REGISTERS_COUNT + REGISTER_FLAG_INVOKE_TRAP
+    ].into();
+    value != 0
+  }
+
+  pub fn get_current_instruction(&self) -> Option<&Instruction> {
+    self.program.instructions.get(self.pc)
+  }
+
+  pub fn run_next(&mut self, supervisor: &mut dyn ProcesSupervisor) -> bool {
+    if let Some(&instruction) = self.program.instructions.get(self.pc) {
+      self.pc += 1;
+      self.run_instruction(supervisor, instruction);
+      true
+    } else {
+      false
+    }
+  }
+
+  pub fn run_until_finish(&mut self, supervisor: &mut dyn ProcesSupervisor) {
     while let Some(&instruction) = self.program.instructions.get(self.pc) {
       self.pc += 1;
       self.run_instruction(supervisor, instruction)
     }
   }
 
-  pub fn run_instruction(&mut self, supervisor: &mut impl ProcesSupervisor, instruction: Instruction) {
+  pub fn run_instruction(&mut self, supervisor: &mut dyn ProcesSupervisor, instruction: Instruction) {
     macro_rules! arg {
       ($idx: tt) => {
         instruction.$idx.and_then(|x| Some(x.into())).or_else(|| self.stack.pop())
@@ -242,7 +263,8 @@ impl Process {
       }
       Opcode::PrepareInvoke => match (arg!(1), arg!(2)) {
         (StackValue::Int(address), StackValue::Int(size)) => {
-          self.invoke_target = supervisor.memory(|memory| memory.read(address as usize, size as usize).into());
+          self.invoke_target = supervisor.get_memory()
+            .memory(|memory| memory.read(address as usize, size as usize).into());
         },
         _ => panic!("expecting: address :: int, size :: int")
       },
@@ -254,7 +276,8 @@ impl Process {
       },
       Opcode::FastInvoke => match (arg!(1), arg!(2)) {
         (StackValue::Int(address), StackValue::Int(size)) => {
-          let invoke_target: Vec<_> = supervisor.memory(|memory| memory.read(address as usize, size as usize).into());
+          let invoke_target: Vec<_> = supervisor.get_memory()
+            .memory(|memory| memory.read(address as usize, size as usize).into());
           self.invoke_target = invoke_target.clone();
           if let Some(value) = supervisor.invoke_ffi(&invoke_target, self) {
             self.stack.push(value);
