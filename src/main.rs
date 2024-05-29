@@ -2,11 +2,10 @@ use std::{fs::{self, OpenOptions}, io};
 
 use clap::Parser as ArgsParser;
 use memmap2::MmapOptions;
-use parser::simple::SimpleParserError;
 use thiserror::Error;
 use vm::{ffi::{FFIError, FFILoader}, machine::MachineBuilder, program::Program};
 
-use crate::{parser::{simple, Parser}, vm::machine::Machine};
+use crate::{parser::{v2, Parser}, vm::machine::Machine};
 
 pub mod vm;
 pub mod parser;
@@ -18,7 +17,7 @@ enum RuntimeError {
   Fs(#[from] io::Error),
 
   #[error("parse error: {0}")]
-  SimpleParser(#[from] SimpleParserError),
+  ParsingError(#[from] v2::SimpleParserError),
 
   #[error("{0}")]
   FFIError(#[from] FFIError)
@@ -54,7 +53,7 @@ fn main() -> Result<(), RuntimeError> {
   args.files.iter().map(|file| -> Result<Program, RuntimeError> {
     let mut program = Program::with_name(&file);
     let content = fs::read_to_string(file)?;
-    simple::Simple::parse(&mut program, content)?;
+    v2::Simple::parse(&mut program, content)?;
     Ok(program)
   }).collect::<Result<Vec<Program>, _>>()?.into_iter().for_each(|program| machine.launch(program));
 
