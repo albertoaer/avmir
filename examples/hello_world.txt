@@ -1,0 +1,13 @@
+; declare ffi function name and message in memory
+print #std_println
+message #hello world!
+
+; enable memory share in special registry 10
+SetReg 10 1
+
+; set address and size of the message
+SetReg 0 $message
+SetReg 1 @message
+
+; perform the invocation with the address and size of the function name
+FastInvoke $print @print
