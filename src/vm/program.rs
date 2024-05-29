@@ -29,7 +29,7 @@ pub enum Opcode {
   Over,
 
   Reg,
-  RegSet,
+  SetReg,
 
   WriteInt64,
   ReadInt64,

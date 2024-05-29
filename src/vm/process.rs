@@ -232,7 +232,7 @@ impl Process {
         StackValue::Int(reg) => self.stack.push(self.registers[reg as usize]),
         _ => panic!("expecting: reg :: int")
       }
-      Opcode::RegSet => match arg!(both) {
+      Opcode::SetReg => match arg!(both) {
         (StackValue::Int(reg), value) => self.registers[reg as usize] = value,
         _ => panic!("expecting: registry :: int, value :: any")
       }
