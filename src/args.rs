@@ -3,8 +3,6 @@ use thiserror::Error;
 
 use clap::Parser;
 
-const VERSION: &'static str = "0.1.0";
-
 #[derive(Debug, Clone)]
 pub enum MemoryInput {
   Virtual {
@@ -37,7 +35,7 @@ impl FromStr for MemoryInput {
 }
 
 #[derive(Parser)]
-#[command(version = VERSION, about)]
+#[command(version, about)]
 pub struct Args {
   #[arg(short)]
   pub memory: Vec<MemoryInput>,
