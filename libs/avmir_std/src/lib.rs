@@ -1,4 +1,4 @@
-use avmir::vm::{memory::Memory, process::PublicRegisters, stack::StackValue};
+use avmir::vm::{memory::Memory, process::{ProcesSupervisor, Process, PublicRegisters}, stack::StackValue};
 
 /// hello world function to know everything worked
 #[no_mangle]
@@ -39,5 +39,21 @@ fn std_reg_print(regs: &PublicRegisters) -> Option<StackValue> {
 #[no_mangle]
 fn std_reg_println(regs: &PublicRegisters) -> Option<StackValue> {
   println!("{}", regs[0]);
+  None
+}
+
+/// debug trap while handle the program showing the current instruction until it finishes
+#[no_mangle]
+fn std_trap_debug(process: &mut Process, supervisor: &mut dyn ProcesSupervisor) -> Option<StackValue> {
+  loop {
+    if let Some(intruction) = process.get_current_instruction() {
+      println!("RUNNING: {}", intruction);
+    }
+
+    if !process.run_next(supervisor) {
+      break
+    }
+  }
+  println!("DONE!");
   None
 }

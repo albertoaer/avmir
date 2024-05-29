@@ -1,8 +1,8 @@
 use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread::{self, JoinHandle}};
 
 use super::{
-  ffi::{invoke_ffi, invoke_ffi_memory, FFILoader},
-  memory::Memory,
+  ffi::{invoke_ffi, invoke_ffi_memory, invoke_ffi_trap, FFILoader},
+  memory::{Memory, MemoryHandler},
   process::{ProcesSupervisor, Process, PUBLIC_REGISTERS_COUNT},
   program::Program, stack::StackValue
 };
@@ -55,18 +55,10 @@ impl ProcesSupervisor for MachineProcessSupervisor {
     }
   }
 
-  fn memory<T>(&self, effect: impl FnOnce(&dyn Memory) -> T) -> T {
-    match &self.external_memory {
-      Some(external) => effect(& *external.read().unwrap()),
-      None => effect(&self.memory)
-    }
-  }
-
-  fn memory_mut<T>(&mut self, effect: impl FnOnce(&mut dyn Memory) -> T) -> T {
-    match &self.external_memory {
-      Some(external) => effect(&mut *external.write().unwrap()),
-      None => effect(&mut self.memory)
-    }
+  fn get_memory(&mut self) -> MemoryHandler {
+    self.external_memory.as_ref()
+      .map(|x| MemoryHandler::MemoryLock(x.clone()))
+      .unwrap_or(MemoryHandler::MemoryRef(&mut self.memory))
   }
 
   fn fork(&self, process: Process) {
@@ -75,16 +67,23 @@ impl ProcesSupervisor for MachineProcessSupervisor {
   
   fn invoke_ffi(&mut self, symbol: &[u8], process: &mut Process) -> Option<StackValue> {
     let registers = &mut process.registers[0..PUBLIC_REGISTERS_COUNT].try_into().unwrap();
-    if !process.get_flag_share_memory() {
+
+    if process.get_flag_invoke_trap() { // ffi invoking a trap
+      let machine = self.machine.clone();
+
       unsafe {
-        invoke_ffi(&self.machine.ffi, symbol, registers)
+        invoke_ffi_trap(&machine.ffi, symbol, process, self)
       }.unwrap()
-    } else {
+    } else if process.get_flag_share_memory() { // ffi sharing memory
       unsafe {
-          match &self.external_memory {
+        match &self.external_memory {
           Some(external) => invoke_ffi_memory(&self.machine.ffi, symbol, registers, &mut *external.write().unwrap()),
           None => invoke_ffi_memory(&self.machine.ffi, symbol, registers,  &mut self.memory)
         }
+      }.unwrap()
+    } else { // normal ffi
+      unsafe {
+        invoke_ffi(&self.machine.ffi, symbol, registers)
       }.unwrap()
     }
   }

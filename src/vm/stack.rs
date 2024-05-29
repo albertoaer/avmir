@@ -44,7 +44,7 @@ stack_value_cast_into!(usize);
 stack_value_cast_into!(i64);
 stack_value_cast_into!(f64);
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub struct Stack {
   items: [StackValue; 32],
   offset: u8
@@ -70,6 +70,15 @@ impl Stack {
     } else {
       self.offset -= 1;
       Some(self.items[self.offset as usize])
+    }
+  }
+
+  pub fn pop2(&mut self) -> Option<(StackValue, StackValue)> {
+    if self.offset < 2 {
+      None
+    } else {
+      self.offset -= 2;
+      Some((self.items[(self.offset + 1) as usize], self.items[self.offset as usize]))
     }
   }
   

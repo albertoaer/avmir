@@ -1,6 +1,8 @@
-use strum_macros::EnumString;
+use std::fmt::Display;
 
-#[derive(Clone, Debug, Copy, EnumString)]
+use strum_macros::{Display, EnumString};
+
+#[derive(Clone, Debug, Copy, EnumString, Display)]
 pub enum Opcode {
   Noop,
 
@@ -62,6 +64,15 @@ pub enum InstructionParam {
   Float(f64),
 }
 
+impl Display for InstructionParam {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      InstructionParam::Int(x) => write!(f, "{}", x),
+      InstructionParam::Float(x) => write!(f, "{}", x),
+    }
+  }
+}
+
 #[derive(Clone, Debug, Copy)]
 pub struct Instruction(pub Opcode, pub Option<InstructionParam>, pub Option<InstructionParam>);
 
@@ -72,6 +83,18 @@ impl Instruction {
 
   pub fn with_args(opcode: Opcode, first: Option<InstructionParam>, second: Option<InstructionParam>) -> Instruction {
     Instruction(opcode, first, second)
+  }
+}
+
+impl Display for Instruction {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.0)?;
+    match (self.1, self.2) {
+      (None, None) => Ok(()),
+      (None, Some(b)) => write!(f, " _ {}", b),
+      (Some(a), None) => write!(f, " {}", a),
+      (Some(a), Some(b)) => write!(f, " {} {}", a, b),
+    }
   }
 }
 
