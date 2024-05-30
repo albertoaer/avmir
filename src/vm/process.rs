@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use super::{instruction::ProcessInstruction, memory::MemoryHandler, program::{Instruction, Opcode, Program}, stack::{Stack, StackValue}};
 
 macro_rules! same_type_op {
@@ -152,6 +154,7 @@ impl Process {
 
     match instruction.opcode {
       Opcode::Noop => (),
+      Opcode::Debug => println!("{:?}", self.stack),
 
       Opcode::Add => {
         let (a, b) = arg!(both);
@@ -195,13 +198,6 @@ impl Process {
         self.stack.push(same_type_op!((StackValue::Int => i64) a != b));
       }
 
-      Opcode::Discard => { self.stack.pop(); }
-      Opcode::Clone => if let Some(item) = self.stack.peek() { self.stack.push(item) }
-      Opcode::Debug => println!("{:?}", self.stack),
-      Opcode::Push => {
-        let item = arg!(first);
-        self.stack.push(item)
-      }
       Opcode::Int => {
         let value = arg!(first).into();
         self.stack.push(StackValue::Int(value))
@@ -210,11 +206,16 @@ impl Process {
         let value = arg!(first).into();
         self.stack.push(StackValue::Float(value))
       }
-      Opcode::Jump => match arg!(both) {
-        (StackValue::Int(pc), StackValue::Int(cond)) => if cond != 0 {
-          self.pc = pc as usize
-        },
-        _ => panic!("expecting: pc :: int, cond :: int")
+
+      Opcode::Discard => { self.stack.pop(); }
+      Opcode::Clone => if let Some(item) = self.stack.peek() { self.stack.push(item) }
+      Opcode::Push => {
+        if let Some(item) = instruction.operands.0 {
+          self.stack.push(item)
+        }
+        if let Some(item) = instruction.operands.1 {
+          self.stack.push(item)
+        }
       }
       Opcode::Swap => {
         let (a, b) = arg!(both);
@@ -278,14 +279,27 @@ impl Process {
         _ => panic!("expecting: unit :: int >= 0")
       }
       Opcode::Unmount => supervisor.set_memory(None),
+      
+      Opcode::Jump => match arg!(both) {
+        (StackValue::Int(pc), StackValue::Int(cond)) => if cond != 0 {
+          self.pc = pc as usize
+        },
+        _ => panic!("expecting: pc :: int, cond :: int")
+      }
       Opcode::Fork => match arg!(first) {
-        StackValue::Int(pc_offset) => {
+        StackValue::Int(pc) => {
           let mut cloned = self.clone();
-          cloned.pc = (cloned.pc as i64 + pc_offset) as usize;
+          cloned.pc = pc as usize;
           supervisor.fork(cloned)
         },
-        _ => panic!("expecting: pc_offset :: int")
+        _ => panic!("expecting: pc :: int")
       }
+      Opcode::Exit => self.pc = self.instructions.len(),
+      Opcode::ThreadSleep => match arg!(first) {
+        StackValue::Int(millis) => thread::sleep(Duration::from_millis(millis as u64)),
+        _ => panic!("expecting: millis :: int")
+      }
+
       Opcode::PrepareInvoke => match arg!(both) {
         (StackValue::Int(address), StackValue::Int(size)) => {
           self.invoke_target = supervisor.get_memory()

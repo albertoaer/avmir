@@ -4,32 +4,32 @@ use strum_macros::{Display, EnumString};
 
 #[derive(Clone, Debug, Copy, EnumString, Display)]
 pub enum Opcode {
-  Noop,
+  Noop, // does nothing
+  Debug, // print the stack
 
-  Add,
-  Sub,
-  Mul,
-  Div,
+  Add, // +
+  Sub, // -
+  Mul, // *
+  Div, // /
 
-  Gt,
-  Ls,
-  Gteq,
-  Lseq,
-  Eq,
-  Noteq,
+  Gt, // >
+  Ls, // <
+  Gteq, // >=
+  Lseq, // <=
+  Eq, // ==
+  Noteq, // !=
 
-  Discard,
-  Clone,
-  Debug,
-  Push,
-  Int,
-  Float,
-  Jump,
-  Swap,
-  Over,
+  Int, // any => int
+  Float, // any => float
 
-  Reg,
-  SetReg,
+  Discard, // a =>
+  Clone, // a => a a
+  Push, // => a
+  Swap, // a b => b a
+  Over, // a b => a b a
+
+  Reg, // i; reg[i]
+  SetReg, // i a; reg[i] = a
 
   WriteInt64,
   ReadInt64,
@@ -49,13 +49,17 @@ pub enum Opcode {
   WriteFloat32,
   ReadFloat32,
 
-  Mount,
-  Unmount,
-  Fork,
+  Mount, // set the shared memory as active memory
+  Unmount, // set the process memory as active memory
 
-  PrepareInvoke,
-  Invoke,
-  FastInvoke
+  Jump, // a b; pc = a if b != 0
+  Fork, // a; spawn a clone process with pc = a
+  Exit, // pc = last instruction + 1
+  ThreadSleep, // a; sleeps the current thread 'a' milliseconds
+
+  PrepareInvoke, // a b; invoke_target = [a..(a + b)]
+  Invoke, // invoke invoke_target
+  FastInvoke // a b; PrepareInvoke + Invoke
 }
 
 #[derive(Clone, Debug, Copy)]
