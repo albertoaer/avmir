@@ -1,0 +1,7 @@
+Mount 0
+
+loop: ReadInt64 0
+Debug
+
+Ls _ 50000
+Jump $loop

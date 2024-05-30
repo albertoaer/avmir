@@ -1,0 +1,12 @@
+Mount 0
+
+Push 0
+
+loop: Add 1
+Clone
+Clone
+WriteInt64 0
+
+Noteq 50000
+
+Jump $loop
