@@ -45,7 +45,7 @@ fn config_machine(args: &args::Args, mut builder: MachineBuilder) -> Result<Mach
   Ok(builder)
 }
 
-fn main() -> Result<(), RuntimeError> {
+fn run() -> Result<(), RuntimeError> {
   let args = args::Args::parse();
   let machine_builder = MachineBuilder::new();
   let mut machine: Machine = config_machine(&args, machine_builder)?.build();
@@ -59,5 +59,15 @@ fn main() -> Result<(), RuntimeError> {
 
   machine.wait();
 
+  Ok(())
+}
+
+fn main() -> Result<(), RuntimeError> {
+  if let Err(err) = run() {
+
+    eprintln!("{}", err.to_string());
+
+    return Err(err)
+  }
   Ok(())
 }
