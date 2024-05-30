@@ -91,3 +91,5 @@ $ cargo run examples/concurrent_rw/loop_write.txt -m 1024:a_common_file.dump
 ```
 
 Beware that the file will remain in disk, so if you try to run again, as the last value in the file (also the memory) will be the expected value to exit the loop, the program will have no effect but outputing one value to console.
+
+There is also an [example about forking a process](/examples/fork.txt) you should check it out if you want a more complex example.

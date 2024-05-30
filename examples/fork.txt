@@ -1,0 +1,21 @@
+print #std_println
+parent_msg #message from parent
+child_msg #message from child
+
+; allow share memory
+SetReg 10 1
+
+Fork $child
+Jump $parent 1
+
+; child block
+child: SetReg 0 $child_msg
+SetReg 1 @child_msg
+FastInvoke $print @print
+Exit
+
+; parent block
+parent: ThreadSleep 1000
+SetReg 0 $parent_msg
+SetReg 1 @parent_msg
+FastInvoke $print @print
