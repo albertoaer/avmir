@@ -59,7 +59,9 @@ pub enum Opcode {
 
   PrepareInvoke, // a b; invoke_target = [a..(a + b)]
   Invoke, // invoke invoke_target
-  FastInvoke // a b; PrepareInvoke + Invoke
+  FastInvoke, // a b; PrepareInvoke + Invoke
+  
+  Pid // push the process id onto the stack
 }
 
 #[derive(Clone, Debug, Copy)]

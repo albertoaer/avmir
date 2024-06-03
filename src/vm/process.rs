@@ -43,6 +43,7 @@ macro_rules! mem {
 }
 
 pub trait ProcesSupervisor {
+  fn get_pid(&self) -> usize;
   fn set_memory(&mut self, unit: Option<usize>);
   fn get_memory(&mut self) -> MemoryHandler;
   fn fork(&self, process: Process);
@@ -324,6 +325,8 @@ impl Process {
         },
         _ => panic!("expecting: address :: int, size :: int")
       },
+
+      Opcode::Pid => self.stack.push(StackValue::Int(supervisor.get_pid() as i64))
     };
   }
 }

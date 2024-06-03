@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Condvar, Mutex, RwLock}, thread::{self, JoinHandle}};
+use std::{sync::{atomic::AtomicUsize, Arc, Condvar, Mutex, RwLock}, thread::{self, JoinHandle}};
 
 use super::{
   ffi::{invoke_ffi, invoke_ffi_memory, invoke_ffi_trap, FFILoader},
@@ -10,7 +10,8 @@ use super::{
 struct MachineInternal {
   active: (Mutex<usize>, Condvar),
   buffers: Vec<Arc<RwLock<dyn Memory>>>,
-  ffi: Vec<FFILoader>
+  ffi: Vec<FFILoader>,
+  pid_counter: AtomicUsize
 }
 
 impl MachineInternal {
@@ -18,7 +19,8 @@ impl MachineInternal {
     MachineInternal {
       active: (Mutex::new(0), Condvar::new()),
       buffers: vec![],
-      ffi: vec![]
+      ffi: vec![],
+      pid_counter: AtomicUsize::new(0)
     }
   }
 
@@ -29,25 +31,35 @@ impl MachineInternal {
   pub fn add_ffi_loader(&mut self, loader: FFILoader) {
     self.ffi.push(loader)
   }
+
+  pub fn get_new_pid(&self) -> usize {
+    self.pid_counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+  }
 }
 
 struct MachineProcessSupervisor {
   machine: Arc<MachineInternal>,
   memory: Vec<u8>,
-  external_memory: Option<Arc<RwLock<dyn Memory>>>
+  external_memory: Option<Arc<RwLock<dyn Memory>>>,
+  pid: usize,
 }
 
 impl MachineProcessSupervisor {
-  pub fn new(machine: Arc<MachineInternal>, memory: Vec<u8>) -> Self {
+  pub fn new(pid: usize, machine: Arc<MachineInternal>, memory: Vec<u8>) -> Self {
     MachineProcessSupervisor {
       machine,
       memory,
-      external_memory: None
+      external_memory: None,
+      pid
     }
   }
 }
 
 impl ProcesSupervisor for MachineProcessSupervisor {
+  fn get_pid(&self) -> usize {
+    self.pid
+  }
+
   fn set_memory(&mut self, unit: Option<usize>) {
     self.external_memory = match unit {
       Some(idx) => Some(self.machine.buffers[idx].clone()),
@@ -96,14 +108,15 @@ fn launch(machine: Arc<MachineInternal>, mut process: Process) -> Option<JoinHan
 
   *machine.active.0.lock().unwrap() += 1;
 
-  Some(thread::spawn(move || {
-    let mut supervisor = MachineProcessSupervisor::new(machine, process.program.memory());
+  let pid = machine.get_new_pid();
+  Some(thread::Builder::new().name(format!("process_{}", pid)).spawn(move || {
+    let mut supervisor = MachineProcessSupervisor::new(pid, machine, process.program.memory());
 
     process.run_until_finish(&mut supervisor);
     *supervisor.machine.active.0.lock().unwrap() -= 1;
     supervisor.machine.active.1.notify_all();
     process
-  }))
+  }).expect("error creating thread"))
 }
 
 pub struct Machine(Arc<MachineInternal>);
